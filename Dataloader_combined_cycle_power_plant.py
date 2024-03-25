@@ -39,6 +39,13 @@ df_clean = df_normalized.dropna()
 # Split train test
 df_train, df_val = train_test_split(df_clean, test_size=0.2, random_state=42)
 
+# Split and save train data for DL model.Save training data without splitting
+DL_df_train = df_train.copy()
+train_X = DL_df_train.drop('PE', axis=1)
+train_y = DL_df_train['PE']
+np.save('data/DL_X_train.npy', train_X.to_numpy())
+np.save('data/DL_Y_train.npy', train_y.to_numpy())
+
 # Split val dataset into x and y, and save as npy files
 X_ = df_val.drop('PE', axis=1)
 Y_ = df_val['PE']
