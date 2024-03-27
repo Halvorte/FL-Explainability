@@ -3,6 +3,8 @@ print(torch.__version__)
 
 #!pip install -q flwr[simulation] torch torchvision matplotlib
 
+# Flower file for the combined cycle power plant dataset
+
 from collections import OrderedDict
 from typing import Dict, List, Optional, Tuple
 
@@ -36,17 +38,21 @@ else:
     DEVICE = torch.device("cpu")
     print(f"Training on {DEVICE} using PyTorch {torch.__version__} and Flower {fl.__version__}")
 
+DATASET = 'maintenance_naval_propulsion_plants'
 NUM_CLIENTS = 5
 BATCH_SIZE = 32
-CLIENT_EPOCHS = 20
-NR_ROUNDS = 10   # nr of rounds the federated learning should do
+CLIENT_EPOCHS = 150
+NR_ROUNDS = 20   # nr of rounds the federated learning should do
 LEARNING_RATE = 0.0001
+OPTIMIZER = 'Adam'
 
 TIME = time.time()
 TIME_ = time.time()
 
 accuracies = []
 losses = []
+mae_losses = []
+time_used = []
 
 predicted_ = []
 true_ = []
@@ -61,6 +67,8 @@ def load_datasets():
 
     train_y_data = train_y_data.reshape(-1, 1)
     valid_y_data = valid_y_data.reshape(-1, 1)
+
+    num_features = valid_x_data.shape[1]
 
     valid_x_data_tensor = torch.from_numpy(valid_x_data).type(torch.Tensor)
     valid_y_data_tensor = torch.from_numpy(valid_y_data).type(torch.Tensor)
@@ -80,7 +88,7 @@ def load_datasets():
     generator = torch.Generator().manual_seed(42)
     print(len(train_x_data))
     print(lengths)
-    print(remainders)
+    print(f'remainders: {remainders}')
 
     testDataset = torch.utils.data.TensorDataset(valid_x_data_tensor, valid_y_data_tensor)
 
@@ -112,18 +120,18 @@ def load_datasets():
 
     testloader = DataLoader(testDataset, batch_size=BATCH_SIZE)
 
-    return trainloaders, valloaders, testloader
+    return trainloaders, valloaders, testloader, num_features
 
 
-trainloaders, valloaders, testloader = load_datasets()
+trainloaders, valloaders, testloader, num_features = load_datasets()
 
 
 class Net(nn.Module):
     def __init__(self, in_features: int, out_features: int) -> None:
         super(Net, self).__init__()
-        self.lin1 = nn.Linear(in_features, 8)
+        self.lin1 = nn.Linear(in_features, 64)
         #self.lin2 = nn.Linear()
-        self.lin2 = nn.Linear(8, out_features)
+        self.lin2 = nn.Linear(64, out_features)
         self.rel = nn.ReLU()
 
     def forward(self, x):
@@ -133,22 +141,27 @@ class Net(nn.Module):
         x = self.lin2(x)
         return x
 
-NUM_FEATURES = 4
+NUM_FEATURES = num_features
+print(f'Num features: {NUM_FEATURES}')
 OUT_FEATURES = 1
 model = Net(NUM_FEATURES, OUT_FEATURES)
 criterion = nn.MSELoss()      # Mean Square error loss function
 #criterion = nn.Sigmoid()
-#optimizer = optim.Adam(model.parameters(), LEARNING_RATE)    # Adam optimizer
-optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)     # Stochatic Gradient Descent
-#scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, verbose=True)
+if OPTIMIZER == 'Adam':
+    optimizer = torch.optim.Adam(model.parameters(), LEARNING_RATE)    # Adam optimizer
+else:
+    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)     # Stochatic Gradient Descent
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, verbose=True)
 
 def train(net, trainloader, epochs: int, verbose=False):
     """Train the network on the training set."""
     #print('train function running!')
     #criterion = torch.nn.CrossEntropyLoss()
     criterion = torch.nn.MSELoss()
-    #optimizer = torch.optim.Adam(net.parameters())
-    optimizer = torch.optim.SGD(net.parameters(), lr=LEARNING_RATE)
+    if OPTIMIZER == 'Adam':
+        optimizer = torch.optim.Adam(net.parameters(), LEARNING_RATE)
+    else:
+        optimizer = torch.optim.SGD(net.parameters(), lr=LEARNING_RATE)
     net.train()
     for epoch in range(epochs):
         r2_scores, total, epoch_loss = 0, 0, 0.0
@@ -276,14 +289,13 @@ def evaluate(
     valloader = valloaders[0]
     set_parameters(net, parameters)  # Update model with the latest parameters
     loss, r2_accuracy, mse_accuracy, mae_accuracy = test(net, valloader)
-    print(f"Server-side evaluation loss {loss} / r2-accuracy {r2_accuracy}, mse {mse_accuracy}, mae {mae_accuracy}, round {server_round}")
+    print(f"Server-side evaluation loss {loss}, r2-accuracy {r2_accuracy}, mse {mse_accuracy}, mae {mae_accuracy}, round {server_round}")
     accuracies.append(r2_accuracy)
     losses.append(loss)
+    mae_losses.append(mae_accuracy)
     time_now = time.time()
     time_sofar = time_now - TIME
-    #time_used = time_now - TIME_
-    #TIME_ = time.time()
-    #print(f'Time used on this round: {time_used}')
+    time_used.append(time_sofar)
     print(f'Time used so far: {time_sofar}')
     return loss, {"accuracy": r2_accuracy}
 
@@ -348,11 +360,12 @@ x_losses = list(range(nr))
 y_losses = losses
 
 plt.plot(x_losses, y_losses)
-plt.title('Losses over rounds')
+plt.title('Losses over rounds\n'
+          f'{DATASET}')
 plt.xlabel('Rounds of federated learning')
 plt.ylabel('Loss')
-plt.ylim(0,20)
-#plt.savefig('losses.png')
+plt.ylim(0,0.000001)
+plt.savefig(f'images/losses_fl_{DATASET}.png')
 plt.show()
 
 # Accuracy
@@ -361,11 +374,12 @@ x_acc = list(range(nrr))
 y_acc = accuracies
 
 plt.plot(x_acc, y_acc, color='red')
-plt.title('R2-Accuracy over rounds')
+plt.title('R2-Accuracy over rounds\n'
+          f'{DATASET}')
 plt.xlabel('Rounds of federated learning')
 plt.ylabel('Accuracy')
 plt.ylim(0,1.1)
-#plt.savefig('accuracy.png')
+plt.savefig(f'images/r2_accuracy_fl_{DATASET}.png')
 plt.show()
 
 
@@ -373,4 +387,9 @@ print(f'nr of clients: {NUM_CLIENTS}\n'
       f'batch size: {BATCH_SIZE}\n'
       f'client epochs: {CLIENT_EPOCHS}\n'
       f'nr of federated rounds: {NR_ROUNDS}\n'
-      f'learning rate: {LEARNING_RATE}')
+      f'learning rate: {LEARNING_RATE}\n'
+      f'optimizer: {OPTIMIZER}\n'
+      f'R2: {accuracies[-1]}\n'
+      f'MSE: {losses[-1]}\n'
+      f'MAE: {mae_losses[-1]}\n'
+      f'Time_used: {time_used[-1]}')

@@ -22,13 +22,10 @@ df.rename(columns=lambda x: x.replace(' ', ''), inplace=True)
 # Normalize the train data
 #scaler = StandardScaler()
 scaler = MinMaxScaler()
-#cols = df_train.columns[df_train.columns != ['Country', 'Year', 'Status', 'Life expectancy']]
 cols_to_normalize = [col for col in df.columns if col not in ['PE']]
 df_normalized = df.copy()
 df_normalized[cols_to_normalize] = scaler.fit_transform(df_normalized[cols_to_normalize])
 
-#df_train[cols] = scaler.fit_transform(df_train[cols])
-#df_train_normalized = pd.DataFrame(df_train_normalized, columns=['Adult Mortality', 'infant deaths', 'Alcohol', 'percentage expenditure', 'Hepatitis B', 'Measles ', ' BMI ', 'under-five deaths ', 'Polio', 'Total expenditure', 'Diphtheria ', ' HIV/AIDS', 'GDP', 'Population', ' thinness  1-19 years', ' thinness 5-9 years', 'Income composition of resources', 'Schooling'])
 
 print(df_normalized)
 

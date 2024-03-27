@@ -33,17 +33,19 @@ cols_to_normalize = [col for col in df.columns if col not in ['GT1','GT2']]
 df_normalized = df.copy()
 df_normalized[cols_to_normalize] = scaler.fit_transform(df_normalized[cols_to_normalize])
 
-#df_train[cols] = scaler.fit_transform(df_train[cols])
-#df_train_normalized = pd.DataFrame(df_train_normalized, columns=['Adult Mortality', 'infant deaths', 'Alcohol', 'percentage expenditure', 'Hepatitis B', 'Measles ', ' BMI ', 'under-five deaths ', 'Polio', 'Total expenditure', 'Diphtheria ', ' HIV/AIDS', 'GDP', 'Population', ' thinness  1-19 years', ' thinness 5-9 years', 'Income composition of resources', 'Schooling'])
-
-print(df_normalized)
-
 # drop emty rows.
 # Can impute the values instead of removing in the future
 df_clean = df_normalized.dropna()
 
 # Split train test
 df_train, df_val = train_test_split(df_clean, test_size=0.2, random_state=42)
+
+# Split and save train data for DL model.Save training data without splitting
+DL_df_train = df_train.copy()
+train_X = DL_df_train.drop('GT2', axis=1)
+train_y = DL_df_train['GT2']
+np.save('data/DL_X_train.npy', train_X.to_numpy())
+np.save('data/DL_Y_train.npy', train_y.to_numpy())
 
 # Split val dataset into x and y, and save as npy files
 X_ = df_val.drop('GT2', axis=1)

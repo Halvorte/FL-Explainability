@@ -27,35 +27,15 @@ print(f'Missing values percentages: {missing_percentages}')
 print(df.info)
 print(df.describe())
 
-# Remove country column
-#df = df.drop(['Country'], axis=1)
-#print(df)
-
-# fix spaces in column names
-#df.rename(columns=lambda x: x.replace(' ', ''), inplace=True)
-
-# Convert columns with strings to numbers
-#country_encoder = LabelEncoder()
-#df['Country'] = country_encoder.fit_transform(df['Country'])
-
-# Encode country column
-#year_encoder = LabelEncoder()
-#df['Year'] = year_encoder.fit_transform(df['Year'])
-
-# Encode the year column
-#year_encoder = LabelEncoder()
-#df['Year'] = year_encoder.fit_transform(df['Year'])
-
-# Encode the status column
-#status_encoder = LabelEncoder()
-#df['Status'] = year_encoder.fit_transform(df['Status'])
-
-#print(df)
-
 # Split train test and x and y
 df_train, df_val = train_test_split(df, test_size=0.3, random_state=42)
 
-print(f'df_train head: {df.head()}')
+# Split and save train data for DL model.Save training data without splitting
+DL_df_train = df_train.copy()
+train_X = DL_df_train.drop('Goal', axis=1)
+train_y = DL_df_train['Goal']
+np.save('data/DL_X_train.npy', train_X.to_numpy())
+np.save('data/DL_Y_train.npy', train_y.to_numpy())
 
 # Normalize the train data
 #scaler = StandardScaler()
@@ -89,8 +69,6 @@ clients = 1
 client = 0
 
 for data in train_datasets:
-    #data = train_datasets[i]
-    #X = data[['Country', 'Year', 'Status', 'AdultMortality', 'infantdeaths', 'Alcohol', 'percentageexpenditure', 'HepatitisB', 'Measles', 'BMI', 'under-fivedeaths', 'Polio', 'Totalexpenditure', 'Diphtheria', 'HIV/AIDS', 'GDP', 'Population', 'thinness1-19years', 'thinness5-9years', 'Incomecompositionofresources', 'Schooling']]
     X = data[cols_to_normalize]
     Y = data['Goal']
 

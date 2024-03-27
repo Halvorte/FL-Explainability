@@ -1,4 +1,6 @@
 # Run a simulated cross-silo Federated Learning dataset on a Deep Learning model
+import time
+
 import numpy
 # Imports
 import numpy as np
@@ -6,7 +8,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
+import matplotlib.pyplot as plt
+import numpy as np
 import torchvision
 import torchvision.transforms as transforms
 import openfl.native as fx
@@ -28,17 +31,6 @@ print('PyTorch', torch.__version__)
 # Better CPU Utilization
 os.environ['OMP_NUM_THREADS'] = str(int(os.cpu_count()))
 
-# Logging fix for Google Colab
-log = logging.getLogger()
-log.setLevel(logging.INFO)
-
-# Switch to the tutorial directory within OpenFL tutorials
-#tutorial_dir = os.path.abspath('openfl/openfl-tutorials/interactive_api/PyTorch_MedMNIST_2D')
-#os.chdir(tutorial_dir)
-
-# Set up workspace
-#fx.init('DL_CCPowerPlant')
-
 # Get data after running the dataloader
 train_x_data = numpy.load('data/DL_X_train.npy')
 train_y_data = numpy.load('data/DL_Y_train.npy')
@@ -49,85 +41,68 @@ valid_y_data = numpy.load('data/y_test.npy')
 train_y_data = train_y_data.reshape(-1, 1)
 valid_y_data = valid_y_data.reshape(-1, 1)
 
-# Define helper function to convert NumPy arrays to PyTorch tensors
-#def to_tensor(x, y):
-  #return torch.Tensor(x), torch.Tensor(y)
-
-# Convert every row to a tensor
-#train_x_data_tensor = [torch.Tensor(row) for row in train_x_data]
-#train_y_data_tensor = [torch.Tensor(row) for row in train_y_data]
-#valid_x_data_tensor = [torch.Tensor(row) for row in valid_x_data]
-#valid_y_data_tensor = [torch.Tensor(row) for row in valid_y_data]
-
-#train_x_data_tensor = torch.tensor(train_x_data, dtype=torch.float32)
-#train_y_data_tensor = torch.tensor(train_y_data, dtype=torch.float32)
-#valid_x_data_tensor = torch.tensor(valid_x_data, dtype=torch.float32)
-#valid_y_data_tensor = torch.tensor(valid_y_data, dtype=torch.float32)
+num_features = valid_x_data.shape[1]
+print(f'Num features: {num_features}')
 
 train_x_data_tensor = torch.from_numpy(train_x_data).type(torch.Tensor)
 train_y_data_tensor = torch.from_numpy(train_y_data).type(torch.Tensor)
 valid_x_data_tensor = torch.from_numpy(valid_x_data).type(torch.Tensor)
 valid_y_data_tensor = torch.from_numpy(valid_y_data).type(torch.Tensor)
 
-# Convert data to Tensors
-#train_data = to_tensor(train_x_data, train_y_data)
-#test_data = to_tensor(valid_x_data, valid_y_data)
-
-
-#train_data = train_x_data_tensor, train_y_data_tensor
-#test_data = valid_x_data_tensor, valid_y_data_tensor
-# Define batch size (adjust this value based on your needs)
-batch_size = 16
-num_workers = 6
-
-
-trainDataset = torch.utils.data.TensorDataset(train_x_data_tensor, train_y_data_tensor)
-#train_dataloader = torch.utils.data.DataLoader(trainDataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
-
-testDataset = torch.utils.data.TensorDataset(valid_x_data_tensor, valid_y_data_tensor)
-#test_dataloader = torch.utils.data.DataLoader(testDataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
-
-
-# Create training and testing dataloader
-train_dataloader = torch.utils.data.DataLoader(trainDataset, batch_size=batch_size, shuffle=True)
-#train_dataloader = torch.utils.data.DataLoader(list(zip(train_x_data_tensor, train_y_data_tensor)), batch_size=batch_size, shuffle=True)
-test_dataloader = torch.utils.data.DataLoader(testDataset, batch_size=batch_size, shuffle=False)
-#test_dataloader = torch.utils.data.DataLoader(list(zip(valid_x_data_tensor, valid_y_data_tensor)), batch_size=batch_size, shuffle=False)
-#dataloader = FederatedDataSet(train_x_data, train_y_data, valid_x_data, valid_y_data)
-
-
 # Model parameters
 LEARNING_RATE = 0.0001
-NUM_CLIENTS = 5
-NUM_EPOCHS = 20
-ROUNDS_TO_TRAIN = 4
-NUM_FEATURES = np.atleast_2d(train_x_data).shape[1]
-print(f'Num features: {NUM_FEATURES}')
+NUM_EPOCHS = 400
+NUM_FEATURES = num_features
 OUT_FEATURES = 1
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 DEVICE = 'cpu'
+DATASET = 'aileron'
+OPTIMIZER = 'Adam'
+
+trainDataset = torch.utils.data.TensorDataset(train_x_data_tensor, train_y_data_tensor)
+testDataset = torch.utils.data.TensorDataset(valid_x_data_tensor, valid_y_data_tensor)
+
+# Create training and testing dataloader
+train_dataloader = torch.utils.data.DataLoader(trainDataset, batch_size=BATCH_SIZE, shuffle=True)
+test_dataloader = torch.utils.data.DataLoader(testDataset, batch_size=BATCH_SIZE, shuffle=False)
 
 
 class Net(nn.Module):
     def __init__(self, in_features: int, out_features: int) -> None:
         super(Net, self).__init__()
-        self.lin1 = nn.Linear(in_features, 8)
-        #self.lin2 = nn.Linear()
-        self.lin2 = nn.Linear(8, out_features)
+        self.lin1 = nn.Linear(in_features, 256)
+        self.lin2 = nn.Linear(256, 128)
+        self.lin3 = nn.Linear(128, out_features)
+        self.lin4 = nn.Linear(64, 32)
+        self.lin5 = nn.Linear(32, out_features)
         self.rel = nn.ReLU()
+        self.dropout = nn.Dropout(0.25)
+        self.batch_norm1 = nn.BatchNorm1d(256)
+        self.batch_norm2 = nn.BatchNorm1d(128)
 
     def forward(self, x):
 
         x = self.lin1(x)
+        x = self.batch_norm1(x)
         x = self.rel(x)
+        x = self.dropout(x)
+
         x = self.lin2(x)
+        x = self.batch_norm2(x)
+        x = self.rel(x)
+        x = self.dropout(x)
+        x = self.lin3(x)
         return x
 
 model = Net(NUM_FEATURES, OUT_FEATURES)
 criterion = nn.MSELoss()      # Mean Square error loss function
+#criterion = nn.CrossEntropyLoss()
+#criterion = nn.L1Loss()
 #criterion = nn.Sigmoid()
-#optimizer = optim.Adam(model.parameters(), LEARNING_RATE)    # Adam optimizer
-optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE)     # Stochatic Gradient Descent
+if OPTIMIZER == 'Adam':
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)    # Adam optimizer
+else:
+    optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE)     # Stochatic Gradient Descent
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, verbose=True)
 # Training/ Validation loops
 def train(model, train_loader, optimizer, device, criterion):
@@ -173,7 +148,7 @@ def train(model, train_loader, optimizer, device, criterion):
         'train_loss': np.round(np.mean(losses), 3),
         'r2': r2,
         'mse': mse,
-    }, mse
+    }, mse, r2
 
 
 def validate(model, data, device, criterion):
@@ -215,14 +190,12 @@ def validate(model, data, device, criterion):
             'val_loss': np.round(np.mean(losses), 3),
             'r2': r2,
             'mse': mse,
+            'mae':mae,
         }
 
-# Train centralized model
-#centralized_model = Net(NUM_FEATURES, OUT_FEATURES)
-#optimizer = torch.optim.Adam(centralized_model.parameters(), lr=LEARNING_RATE)
-#criterion = nn.CrossEntropyLoss()
 
 # Start!
+time_start = time.time()
 history = validate(model,
                    test_dataloader,
                    device=DEVICE,
@@ -230,8 +203,10 @@ history = validate(model,
 print('Before training: ', history)
 
 mse_losses = []
+r2_accuracies = []
+mae_losses = []
 for epoch in range(NUM_EPOCHS):
-    train_history, mse_loss = train(model,
+    train_history, mse_loss, r2 = train(model,
                           train_dataloader,
                           device=DEVICE,
                           optimizer=optimizer,
@@ -240,21 +215,48 @@ for epoch in range(NUM_EPOCHS):
                            test_dataloader,
                            device=DEVICE,
                            criterion=criterion)
-    print(f'Epoch {epoch}: {train_history} - {val_history}')
-    mse_losses.append(mse_loss)
+    print(f'Epoch {epoch}: {train_history} - {val_history} - time used:{time.time() - time_start}')
+    mse_losses.append(val_history['mse'])
+    r2_accuracies.append(val_history['r2'])
+    mae_losses.append(val_history['mae'])
 
-# Plot mse losses for training
-import matplotlib.pyplot as plt
-import numpy as np
+
+# get time used
+time_now = time.time()
+time_used = time_now - time_start
+
 # Losses
 nr = int(len(mse_losses))
 x_losses = list(range(nr))
 y_losses = mse_losses
 
 plt.plot(x_losses, y_losses)
-plt.title('Losses over rounds')
-plt.xlabel('epochs')
+plt.title('Losses over rounds\n'
+          f'{DATASET}')
+plt.xlabel('Epochs')
 plt.ylabel('MSE Loss')
-#plt.savefig('losses.png')
+#plt.ylim(0,25)
+plt.savefig(f'images/losses_nonfl_{DATASET}.png')
 plt.show()
 
+nrr = int(len(r2_accuracies))
+x_acc = list(range(nrr))
+y_acc = r2_accuracies
+
+plt.plot(x_acc, y_acc, color='red')
+plt.title('Accuracy over rounds\n'
+          f'{DATASET}')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+#plt.ylim(0.5,1.1)
+plt.savefig(f'images/r2_accuracy_nonfl_{DATASET}.png')
+plt.show()
+
+print(f'batch size: {BATCH_SIZE}\n'
+      f'epochs: {NUM_EPOCHS}\n'
+      f'learning rate: {LEARNING_RATE}\n'
+      f'R2: {r2_accuracies[-1]}\n'
+      f'mse: {mse_losses[-1]}\n'
+      f'mae: {mae_losses[-1]}\n'
+      f'time used: {time_used}\n'
+      f'optimizer: {OPTIMIZER}')

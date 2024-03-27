@@ -40,6 +40,7 @@ train_y_data = train_y_data.reshape(-1, 1)
 valid_y_data = valid_y_data.reshape(-1, 1)
 
 num_features = valid_x_data.shape[1]
+print(f'Num features: {num_features}')
 
 train_x_data_tensor = torch.from_numpy(train_x_data).type(torch.Tensor)
 train_y_data_tensor = torch.from_numpy(train_y_data).type(torch.Tensor)
@@ -48,16 +49,14 @@ valid_y_data_tensor = torch.from_numpy(valid_y_data).type(torch.Tensor)
 
 # Model parameters
 LEARNING_RATE = 0.0001
-NUM_EPOCHS = 30
+NUM_EPOCHS = 250
 NUM_FEATURES = num_features
-print(f'Num features: {NUM_FEATURES}')
 OUT_FEATURES = 1
 BATCH_SIZE = 32
 DEVICE = 'cpu'
 
 trainDataset = torch.utils.data.TensorDataset(train_x_data_tensor, train_y_data_tensor)
 testDataset = torch.utils.data.TensorDataset(valid_x_data_tensor, valid_y_data_tensor)
-
 
 # Create training and testing dataloader
 train_dataloader = torch.utils.data.DataLoader(trainDataset, batch_size=BATCH_SIZE, shuffle=True)
@@ -67,23 +66,27 @@ test_dataloader = torch.utils.data.DataLoader(testDataset, batch_size=BATCH_SIZE
 class Net(nn.Module):
     def __init__(self, in_features: int, out_features: int) -> None:
         super(Net, self).__init__()
-        self.lin1 = nn.Linear(in_features, 8)
-        #self.lin2 = nn.Linear()
-        self.lin2 = nn.Linear(8, out_features)
+        self.lin1 = nn.Linear(in_features, 64)
+        self.lin2 = nn.Linear(8, 4)
+        self.lin3 = nn.Linear(64, out_features)
         self.rel = nn.ReLU()
+        self.dropout = nn.Dropout(0.25)
 
     def forward(self, x):
 
         x = self.lin1(x)
         x = self.rel(x)
-        x = self.lin2(x)
+        #x = self.dropout(x)
+        x = self.lin3(x)
         return x
 
 model = Net(NUM_FEATURES, OUT_FEATURES)
 criterion = nn.MSELoss()      # Mean Square error loss function
+#criterion = nn.CrossEntropyLoss()
+#criterion = nn.L1Loss()
 #criterion = nn.Sigmoid()
-#optimizer = optim.Adam(model.parameters(), LEARNING_RATE)    # Adam optimizer
-optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE)     # Stochatic Gradient Descent
+optimizer = optim.Adam(model.parameters(), LEARNING_RATE)    # Adam optimizer
+#optimizer = optim.SGD(model.parameters(), lr=LEARNING_RATE)     # Stochatic Gradient Descent
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, verbose=True)
 # Training/ Validation loops
 def train(model, train_loader, optimizer, device, criterion):
@@ -171,7 +174,7 @@ def validate(model, data, device, criterion):
             'val_loss': np.round(np.mean(losses), 3),
             'r2': r2,
             'mse': mse,
-            'mae': mae
+            'mae':mae,
         }
 
 
@@ -208,10 +211,11 @@ y_losses = mse_losses
 
 plt.plot(x_losses, y_losses)
 plt.title('Losses over rounds\n'
-          'Combined Cycle Power Plant')
+          'Maintenance Naval Propulsion Plants')
 plt.xlabel('Epochs')
 plt.ylabel('MSE Loss')
-plt.savefig('images/losses_nonfl_combined_cycle_power_plant.png')
+plt.ylim(0,0.00015)
+plt.savefig('images/losses_nonfl_maintenance_naval_propulsion_plans.png')
 plt.show()
 
 nrr = int(len(r2_accuracies))
@@ -220,10 +224,11 @@ y_acc = r2_accuracies
 
 plt.plot(x_acc, y_acc, color='red')
 plt.title('Accuracy over rounds\n'
-          'Combined Cycle Power Plant')
+          'Maintenance Naval Propulsion Plants')
 plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
-plt.savefig('images/accuracy_nonfl_combined_cycle_power_plant.png')
+plt.ylim(0.5,1.1)
+plt.savefig('images/r2_accuracy_nonfl_maintenance_naval_propulsion_plans.png')
 plt.show()
 
 print(f'batch size: {BATCH_SIZE}\n'
