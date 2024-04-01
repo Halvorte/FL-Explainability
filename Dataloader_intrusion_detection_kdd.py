@@ -54,8 +54,6 @@ def custom_encoder(x):
 
 # Apply the custom function to the 'class' column
 df['class'] = df['class'].apply(custom_encoder)
-#flag_encoder = LabelEncoder()
-#df['class'] = flag_encoder.fit_transform(df['class'])
 
 print(f'df_train head: {df.head()}')
 
@@ -74,6 +72,13 @@ df_clean = df_normalized.dropna()
 
 # Split train test
 df_train, df_val = train_test_split(df_clean, test_size=0.2, random_state=42)
+
+# Split and save train data for DL model.Save training data without splitting
+DL_df_train = df_train.copy()
+train_X = DL_df_train.drop('class', axis=1)
+train_y = DL_df_train['class']
+np.save('data/DL_X_train.npy', train_X.to_numpy())
+np.save('data/DL_Y_train.npy', train_y.to_numpy())
 
 # Split val dataset into x and y, and save as npy files
 X_ = df_val.drop('class', axis=1)

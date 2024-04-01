@@ -12,9 +12,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torchvision
 import torchvision.transforms as transforms
-#import openfl.native as fx
-#from openfl.federated import FederatedModel, FederatedDataSet
-#from openfl.interface.interactive_api.experiment import TaskInterface, DataInterface, ModelInterface, FLExperiment
+import openfl.native as fx
+from openfl.federated import FederatedModel, FederatedDataSet
+from openfl.interface.interactive_api.experiment import TaskInterface, DataInterface, ModelInterface, FLExperiment
 import copy
 import os
 import logging
@@ -26,7 +26,6 @@ import torch
 #import medmnist
 
 print('PyTorch', torch.__version__)
-#print('MedMNIST', medmnist.__version__)
 
 # Better CPU Utilization
 os.environ['OMP_NUM_THREADS'] = str(int(os.cpu_count()))
@@ -51,12 +50,12 @@ valid_y_data_tensor = torch.from_numpy(valid_y_data).type(torch.Tensor)
 
 # Model parameters
 LEARNING_RATE = 0.0001
-NUM_EPOCHS = 100
+NUM_EPOCHS = 20
 NUM_FEATURES = num_features
 OUT_FEATURES = 1
 BATCH_SIZE = 32
 DEVICE = 'cpu'
-DATASET = 'aileron'
+DATASET = 'superconductivity'
 OPTIMIZER = 'Adam'
 
 trainDataset = torch.utils.data.TensorDataset(train_x_data_tensor, train_y_data_tensor)
@@ -70,19 +69,23 @@ test_dataloader = torch.utils.data.DataLoader(testDataset, batch_size=BATCH_SIZE
 class Net(nn.Module):
     def __init__(self, in_features: int, out_features: int) -> None:
         super(Net, self).__init__()
-        self.lin1 = nn.Linear(in_features, 128)
-        self.lin2 = nn.Linear(128, 64)
-        self.lin3 = nn.Linear(64, out_features)
+        self.lin1 = nn.Linear(in_features, 256)
+        self.lin2 = nn.Linear(256, 128)
+        self.lin3 = nn.Linear(128, out_features)
         self.rel = nn.ReLU()
         self.dropout = nn.Dropout(0.2)
+        self.batch_norm1 = nn.BatchNorm1d(256)
+        self.batch_norm2 = nn.BatchNorm1d(128)
 
     def forward(self, x):
 
         x = self.lin1(x)
+        x = self.batch_norm1(x)
         x = self.rel(x)
         x = self.dropout(x)
 
         x = self.lin2(x)
+        x = self.batch_norm2(x)
         x = self.rel(x)
         x = self.dropout(x)
 
@@ -230,7 +233,7 @@ plt.title('Losses over rounds\n'
           f'{DATASET}')
 plt.xlabel('Epochs')
 plt.ylabel('MSE Loss')
-#plt.ylim(0,25)
+#plt.ylim(0,1)
 plt.savefig(f'images/losses_nonfl_{DATASET}.png')
 plt.show()
 
@@ -243,7 +246,7 @@ plt.title('Accuracy over rounds\n'
           f'{DATASET}')
 plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
-#plt.ylim(0.5,1.1)
+plt.ylim(0,1.1)
 plt.savefig(f'images/r2_accuracy_nonfl_{DATASET}.png')
 plt.show()
 

@@ -14,10 +14,6 @@ print(f'nr of empty rows: {num_null}')
 missing_percentages = df.isnull().sum() / len(df) * 100
 print(f'Missing values percentages: {missing_percentages}')
 
-# Remove country column
-#df = df.drop(['Country'], axis=1)
-#print(df)
-
 # fix spaces in column names
 df.rename(columns=lambda x: x.replace(' ', ''), inplace=True)
 print(df)
@@ -25,15 +21,10 @@ print(df)
 # Normalize the train data
 #scaler = StandardScaler()
 scaler = MinMaxScaler()
-#cols = df_train.columns[df_train.columns != ['Country', 'Year', 'Status', 'Life expectancy']]
 cols_to_normalize = [col for col in df.columns if col not in ['quality']]
 df_normalized = df.copy()
 df_normalized[cols_to_normalize] = scaler.fit_transform(df_normalized[cols_to_normalize])
 
-#df_train[cols] = scaler.fit_transform(df_train[cols])
-#df_train_normalized = pd.DataFrame(df_train_normalized, columns=['Adult Mortality', 'infant deaths', 'Alcohol', 'percentage expenditure', 'Hepatitis B', 'Measles ', ' BMI ', 'under-five deaths ', 'Polio', 'Total expenditure', 'Diphtheria ', ' HIV/AIDS', 'GDP', 'Population', ' thinness  1-19 years', ' thinness 5-9 years', 'Income composition of resources', 'Schooling'])
-
-print(df_normalized)
 
 # drop emty rows.
 # Can impute the values instead of removing in the future
@@ -41,6 +32,13 @@ df_clean = df_normalized.dropna()
 
 # Split train test
 df_train, df_val = train_test_split(df_clean, test_size=0.2, random_state=42)
+
+# Split and save train data for DL model.Save training data without splitting
+DL_df_train = df_train.copy()
+train_X = DL_df_train.drop('quality', axis=1)
+train_y = DL_df_train['quality']
+np.save('data/DL_X_train.npy', train_X.to_numpy())
+np.save('data/DL_Y_train.npy', train_y.to_numpy())
 
 # Split val dataset into x and y, and save as npy files
 X_ = df_val.drop('quality', axis=1)
@@ -61,7 +59,6 @@ print(train_datasets)
 clients = 1
 client = 0
 for data in train_datasets:
-    #data = train_datasets[i]
     X = data[['fixedacidity', 'volatileacidity', 'citricacid', 'residualsugar', 'chlorides', 'freesulfurdioxide', 'totalsulfurdioxide', 'density', 'pH', 'sulphates', 'alcohol']]
     Y = data['quality']
 

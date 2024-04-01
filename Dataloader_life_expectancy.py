@@ -14,10 +14,6 @@ print(f'nr of empty rows: {num_null}')
 missing_percentages = df.isnull().sum() / len(df) * 100
 print(f'Missing values percentages: {missing_percentages}')
 
-# Remove country column
-#df = df.drop(['Country'], axis=1)
-#print(df)
-
 # fix spaces in column names
 df.rename(columns=lambda x: x.replace(' ', ''), inplace=True)
 
@@ -38,15 +34,9 @@ print(f'df_train head: {df.head()}')
 # Normalize the train data
 #scaler = StandardScaler()
 scaler = MinMaxScaler()
-#cols = df_train.columns[df_train.columns != ['Country', 'Year', 'Status', 'Life expectancy']]
 cols_to_normalize = [col for col in df.columns if col not in ['Country', 'Year', 'Status', 'Lifeexpectancy']]
 df_normalized = df.copy()
 df_normalized[cols_to_normalize] = scaler.fit_transform(df_normalized[cols_to_normalize])
-
-#df_train[cols] = scaler.fit_transform(df_train[cols])
-#df_train_normalized = pd.DataFrame(df_train_normalized, columns=['Adult Mortality', 'infant deaths', 'Alcohol', 'percentage expenditure', 'Hepatitis B', 'Measles ', ' BMI ', 'under-five deaths ', 'Polio', 'Total expenditure', 'Diphtheria ', ' HIV/AIDS', 'GDP', 'Population', ' thinness  1-19 years', ' thinness 5-9 years', 'Income composition of resources', 'Schooling'])
-
-print(df_normalized)
 
 # drop emty rows.
 # Can impute the values instead of removing in the future

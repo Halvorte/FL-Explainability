@@ -38,10 +38,10 @@ else:
     DEVICE = torch.device("cpu")
     print(f"Training on {DEVICE} using PyTorch {torch.__version__} and Flower {fl.__version__}")
 
-DATASET = 'aileron'
+DATASET = 'red_wine_quality'
 NUM_CLIENTS = 5
 BATCH_SIZE = 32
-CLIENT_EPOCHS = 20
+CLIENT_EPOCHS = 150
 NR_ROUNDS = 10   # nr of rounds the federated learning should do
 LEARNING_RATE = 0.0001
 OPTIMIZER = 'Adam'
@@ -134,13 +134,17 @@ class Net(nn.Module):
         self.lin3 = nn.Linear(64, out_features)
         self.rel = nn.ReLU()
         self.dropout = nn.Dropout(0.2)
+        #self.batch_norm1 = nn.BatchNorm1d(128)
+        #self.batch_norm2 = nn.BatchNorm1d(64)
 
     def forward(self, x):
         x = self.lin1(x)
+        #x = self.batch_norm1(x)
         x = self.rel(x)
         x = self.dropout(x)
 
         x = self.lin2(x)
+        #x = self.batch_norm2(x)
         x = self.rel(x)
         x = self.dropout(x)
 

@@ -24,6 +24,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
 import flwr as fl
 from flwr.common import Metrics
@@ -38,20 +39,22 @@ else:
     DEVICE = torch.device("cpu")
     print(f"Training on {DEVICE} using PyTorch {torch.__version__} and Flower {fl.__version__}")
 
-DATASET = 'aileron'
+DATASET = 'intrusion_detection_kdd'
 NUM_CLIENTS = 5
 BATCH_SIZE = 32
-CLIENT_EPOCHS = 20
+CLIENT_EPOCHS = 10
 NR_ROUNDS = 10   # nr of rounds the federated learning should do
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.001
 OPTIMIZER = 'Adam'
 
 TIME = time.time()
 TIME_ = time.time()
 
-accuracies = []
+accuracies_ = []
 losses = []
-mae_losses = []
+f1_scores_ = []
+precision_scores_ = []
+recall_scores_ = []
 time_used = []
 
 predicted_ = []
@@ -101,7 +104,7 @@ def load_datasets():
         x = train_x_data[nr:(nr + i), :]
         y = train_y_data[nr:(nr + i)]
 
-        train_x_data_partial, test_x_data_partial, train_y_data_partial, test_y_data_partial = train_test_split(x, y, test_size=0.2, random_state=42)
+        train_x_data_partial, test_x_data_partial, train_y_data_partial, test_y_data_partial = train_test_split(x, y, test_size=0.3, random_state=42)
 
         train_x_data_tensor = torch.from_numpy(train_x_data_partial).type(torch.Tensor)
         train_y_data_tensor = torch.from_numpy(train_y_data_partial).type(torch.Tensor)
@@ -132,19 +135,21 @@ class Net(nn.Module):
         self.lin1 = nn.Linear(in_features, 128)
         self.lin2 = nn.Linear(128, 64)
         self.lin3 = nn.Linear(64, out_features)
-        self.rel = nn.ReLU()
-        self.dropout = nn.Dropout(0.2)
+        self.rel = nn.ReLU(inplace=True)
+        self.drop = nn.Dropout(0.2)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = self.lin1(x)
         x = self.rel(x)
-        x = self.dropout(x)
+        x = self.drop(x)
 
         x = self.lin2(x)
         x = self.rel(x)
-        x = self.dropout(x)
+        x = self.drop(x)
 
         x = self.lin3(x)
+        x = self.sigmoid(x)
         return x
 
 NUM_FEATURES = num_features
@@ -154,7 +159,7 @@ model = Net(NUM_FEATURES, OUT_FEATURES)
 criterion = nn.MSELoss()      # Mean Square error loss function
 #criterion = nn.Sigmoid()
 if OPTIMIZER == 'Adam':
-    optimizer = torch.optim.Adam(model.parameters(), LEARNING_RATE)    # Adam optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)    # Adam optimizer
 else:
     optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)     # Stochatic Gradient Descent
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, verbose=True)
@@ -170,7 +175,7 @@ def train(net, trainloader, epochs: int, verbose=False):
         optimizer = torch.optim.SGD(net.parameters(), lr=LEARNING_RATE)
     net.train()
     for epoch in range(epochs):
-        r2_scores, total, epoch_loss = 0, 0, 0.0
+        accuracies, total, epoch_loss = 0, 0, 0.0
         for inputs, targets in trainloader:
             inputs, targets = inputs.to(DEVICE), targets.to(DEVICE)
             optimizer.zero_grad()
@@ -184,21 +189,35 @@ def train(net, trainloader, epochs: int, verbose=False):
             #print(f'targets and outputs: {targets}, {outputs}')
             targets = targets.detach().numpy()
             outputs = outputs.detach().numpy()
-            r2 = r2_score(targets, outputs)
-            r2_scores += r2
+            outputs_ = outputs.copy()
+
+            for i in range(len(outputs_)):
+                if outputs_[i] <= 0.5:
+                    outputs_[i] = 0
+                else:
+                    outputs_[i] = 1
+            y_true = targets
+            y_pred = outputs_
+            accuracy = accuracy_score(y_true, y_pred)
+            #f1 = f1_score(y_true, y_pred)
+            #precision = precision_score(y_true, y_pred)
+            #recall = recall_score(y_true, y_pred)
+
+            #r2 = r2_score(targets, outputs)
+            accuracies += accuracy
             total += 1
         epoch_loss /= len(trainloader.dataset)
-        avg_r2 = r2_scores / total
+        avg_accuracy = accuracies / total
         #r2_scores = r2
         if verbose:
-            print(f"Epoch {epoch+1}: train loss {epoch_loss}, avg-epoch-r2 {avg_r2}")
+            print(f"Epoch {epoch+1}: train loss {epoch_loss}, avg-epoch-accuracy {avg_accuracy}")
 
 
 def test(net, testloader):
     """Evaluate the network on the entire test set."""
     #criterion = torch.nn.CrossEntropyLoss()
     criterion = torch.nn.MSELoss()
-    r2_scores, mse_scores, mae_scores, total, loss = 0, 0, 0, 0, 0.0
+    accuracy_scores, f1_scores, precision_scores, recall_scores, total, loss = 0, 0, 0, 0, 0, 0.0
     net.eval()
     with torch.no_grad():
         for inputs, targets in testloader:
@@ -209,19 +228,36 @@ def test(net, testloader):
             total += 1
             predicted_.append(predicted)    # Add predicted to list so it is possible to create confusion matrix
             true_.append(targets)
+
             targets = targets.detach().numpy()
             outputs = outputs.detach().numpy()
-            r2 = r2_score(targets, outputs)
-            mse = mean_squared_error(targets, outputs)
-            mae = mean_absolute_error(targets, outputs)
-            r2_scores += r2
-            mse_scores += mse
-            mae_scores += mae
+            outputs_ = outputs.copy()
+
+            for i in range(len(outputs_)):
+                if outputs_[i] <= 0.5:
+                    outputs_[i] = 0
+                else:
+                    outputs_[i] = 1
+            y_true = targets
+            y_pred = outputs_
+            accuracy = accuracy_score(y_true, y_pred)
+            f1 = f1_score(y_true, y_pred)
+            precision = precision_score(y_true, y_pred)
+            recall = recall_score(y_true, y_pred)
+
+            #r2 = r2_score(targets, outputs)
+            #mse = mean_squared_error(targets, outputs)
+            #mae = mean_absolute_error(targets, outputs)
+            accuracy_scores += accuracy
+            f1_scores += f1
+            precision_scores += precision
+            recall_scores += recall
     loss /= len(testloader.dataset)
-    r2_accuracy = r2_scores / total
-    mse_accuracy = mse_scores / total
-    mae_accuracy = mae / total
-    return loss, r2_accuracy, mse_accuracy, mae_accuracy
+    tot_accuracy = accuracy_scores / total
+    tot_f1 = f1_scores / total
+    tot_precision = precision_scores / total
+    tot_recall = recall_scores / total
+    return loss, tot_accuracy, tot_f1, tot_precision, tot_recall
 
 
 def get_parameters(net) -> List[np.ndarray]:
@@ -233,6 +269,7 @@ def set_parameters(net, parameters: List[np.ndarray]):
     #print('set_parameters. state_dict')
     params_dict = zip(net.state_dict().keys(), parameters)
     state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+    #print(f'state_dict: {state_dict}')
     net.load_state_dict(state_dict, strict=True)
 
 class FlowerClient(fl.client.NumPyClient):
@@ -252,8 +289,8 @@ class FlowerClient(fl.client.NumPyClient):
 
     def evaluate(self, parameters, config):
         set_parameters(self.net, parameters)
-        loss, r2_accuracy, mse_accuracy, mae_accuracy = test(self.net, self.valloader)
-        return float(loss), len(self.valloader), {"accuracy": float(r2_accuracy)}
+        loss, accuracy, f1, precision, recall = test(self.net, self.valloader)
+        return float(loss), len(self.valloader), {"accuracy": float(accuracy)}
 
 
 def client_fn(cid: str) -> FlowerClient:
@@ -294,16 +331,18 @@ def evaluate(
     net = Net(NUM_FEATURES, OUT_FEATURES).to(DEVICE)
     valloader = valloaders[0]
     set_parameters(net, parameters)  # Update model with the latest parameters
-    loss, r2_accuracy, mse_accuracy, mae_accuracy = test(net, valloader)
-    print(f"Server-side evaluation loss {loss}, r2-accuracy {r2_accuracy}, mse {mse_accuracy}, mae {mae_accuracy}, round {server_round}")
-    accuracies.append(r2_accuracy)
+    loss, accuracy, f1, precision, recall = test(net, valloader)
+    print(f"Server-side evaluation loss {loss}, accuracy {accuracy}, f1 {f1}, precision {precision}, recall {recall}, round {server_round}")
+    accuracies_.append(accuracy)
     losses.append(loss)
-    mae_losses.append(mae_accuracy)
+    f1_scores_.append(f1)
+    precision_scores_.append(precision)
+    recall_scores_.append(recall)
     time_now = time.time()
     time_sofar = time_now - TIME
     time_used.append(time_sofar)
     print(f'Time used so far: {time_sofar}')
-    return loss, {"accuracy": r2_accuracy}
+    return loss, {"accuracy": accuracy}
 
 
 # Function making it possible to sent parameters to the clients
@@ -345,8 +384,6 @@ if DEVICE.type == "cuda":
     client_resources = {"num_gpus": 1}
     print('cuda?')
 
-# print('Yo got here!')
-
 # Start simulation
 fl.simulation.start_simulation(
     client_fn=client_fn,
@@ -370,22 +407,36 @@ plt.title('Losses over rounds\n'
           f'{DATASET}')
 plt.xlabel('Rounds of federated learning')
 plt.ylabel('Loss')
-plt.ylim(0,0.04)
+plt.ylim(0,0.05)
 plt.savefig(f'images/losses_fl_{DATASET}.png')
 plt.show()
 
 # Accuracy
-nrr = int(len(accuracies))
+nrr = int(len(accuracies_))
 x_acc = list(range(nrr))
-y_acc = accuracies
+y_acc = accuracies_
 
 plt.plot(x_acc, y_acc, color='red')
-plt.title('R2-Accuracy over rounds\n'
+plt.title('Accuracy over rounds\n'
           f'{DATASET}')
 plt.xlabel('Rounds of federated learning')
 plt.ylabel('Accuracy')
 plt.ylim(0,1.1)
-plt.savefig(f'images/r2_accuracy_fl_{DATASET}.png')
+plt.savefig(f'images/accuracy_fl_{DATASET}.png')
+plt.show()
+
+# f1-Accuracy
+nrrr = int(len(f1_scores_))
+x_accc = list(range(nrrr))
+y_accc = f1_scores_
+
+plt.plot(x_accc, y_accc, color='red')
+plt.title('F1-Accuracy over rounds\n'
+          f'{DATASET}')
+plt.xlabel('Rounds of federated learning')
+plt.ylabel('f1-Accuracy')
+plt.ylim(0,1.1)
+#plt.savefig(f'images/accuracy_fl_{DATASET}.png')
 plt.show()
 
 
@@ -395,7 +446,9 @@ print(f'nr of clients: {NUM_CLIENTS}\n'
       f'nr of federated rounds: {NR_ROUNDS}\n'
       f'learning rate: {LEARNING_RATE}\n'
       f'optimizer: {OPTIMIZER}\n'
-      f'R2: {accuracies[-1]}\n'
+      f'accuracy: {accuracies_[-1]}\n'
       f'MSE: {losses[-1]}\n'
-      f'MAE: {mae_losses[-1]}\n'
+      f'f1: {f1_scores_[-1]}\n'
+      f'precision: {precision_scores_[-1]}\n'
+      f'recall: {recall_scores_[-1]}\n'
       f'Time_used: {time_used[-1]}')

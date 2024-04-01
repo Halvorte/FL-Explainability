@@ -50,13 +50,13 @@ valid_x_data_tensor = torch.from_numpy(valid_x_data).type(torch.Tensor)
 valid_y_data_tensor = torch.from_numpy(valid_y_data).type(torch.Tensor)
 
 # Model parameters
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.001
 NUM_EPOCHS = 100
 NUM_FEATURES = num_features
 OUT_FEATURES = 1
 BATCH_SIZE = 32
 DEVICE = 'cpu'
-DATASET = 'aileron'
+DATASET = 'pima_indians_diabetes'
 OPTIMIZER = 'Adam'
 
 trainDataset = torch.utils.data.TensorDataset(train_x_data_tensor, train_y_data_tensor)
@@ -70,23 +70,19 @@ test_dataloader = torch.utils.data.DataLoader(testDataset, batch_size=BATCH_SIZE
 class Net(nn.Module):
     def __init__(self, in_features: int, out_features: int) -> None:
         super(Net, self).__init__()
-        self.lin1 = nn.Linear(in_features, 128)
-        self.lin2 = nn.Linear(128, 64)
-        self.lin3 = nn.Linear(64, out_features)
-        self.rel = nn.ReLU()
-        self.dropout = nn.Dropout(0.2)
+        self.lin1 = nn.Linear(in_features, 16)
+        self.lin2 = nn.Linear(16, out_features)
+        self.rel = nn.ReLU(inplace=True)
+        self.drop = nn.Dropout(0.2)
+        #self.sigmoid = F.sigmoid()
 
     def forward(self, x):
 
         x = self.lin1(x)
         x = self.rel(x)
-        x = self.dropout(x)
-
+        x = self.drop(x)
         x = self.lin2(x)
-        x = self.rel(x)
-        x = self.dropout(x)
-
-        x = self.lin3(x)
+        x = F.sigmoid(x)
         return x
 
 model = Net(NUM_FEATURES, OUT_FEATURES)
@@ -127,23 +123,28 @@ def train(model, train_loader, optimizer, device, criterion):
     ### Metrics ###
     targets = targets.detach()
     outputs = outputs.detach()
-    from sklearn.metrics import r2_score
-    r2 = r2_score(targets, outputs)
-
-    # RMSE. Implement RMSE score.
-    from sklearn.metrics import mean_squared_error
-    mse = mean_squared_error(targets, outputs)
-
-    # mean absolute error
-    from sklearn.metrics import mean_absolute_error
-    mae = mean_absolute_error(targets, outputs)
+    #threshold on outputs
+    for i in range(len(outputs)):
+        if outputs[i] <= 0.5:
+            outputs[i]  = 0
+        else:
+            outputs[i] = 1
+    y_true = targets
+    y_pred = outputs
+    from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+    accuracy = accuracy_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred)
+    recall = recall_score(y_true, y_pred)
 
     return {
         #'train_acc': np.round(correct / total, 3),
         'train_loss': np.round(np.mean(losses), 3),
-        'r2': r2,
-        'mse': mse,
-    }, mse, r2
+        'accuracy': accuracy,
+        'f1': f1,
+        'precision': precision,
+        'recall': recall,
+    }
 
 
 def validate(model, data, device, criterion):
@@ -154,11 +155,8 @@ def validate(model, data, device, criterion):
     correct = 0
     total = 0
     with torch.no_grad():
-        #for inputs, targets in tqdm(val_loader, desc="validate"):
-        #for i in range(len(data[0].size(dim=0))):
         for inputs, targets in data:
             outputs = model(inputs.to(device))
-            #outputs = model(data[0][i].to(device))
 
             #targets = torch.squeeze(targets, 1).long().to(device)
             targets = targets.to(device)
@@ -168,24 +166,29 @@ def validate(model, data, device, criterion):
             total += targets.shape[0]
             correct += (outputs.max(1)[1] == targets).sum().cpu().numpy()
 
+            # threshold on outputs
+            for i in range(len(outputs)):
+                if outputs[i] <= 0.5:
+                    outputs[i] = 0
+                else:
+                    outputs[i] = 1
+            y_true = targets
+            y_pred = outputs
+
             ### Metrics ###
-            from sklearn.metrics import r2_score
-            r2 = r2_score(targets, outputs)
-
-            # RMSE. Implement RMSE score.
-            from sklearn.metrics import mean_squared_error
-            mse = mean_squared_error(targets, outputs)
-
-            # mean absolute error
-            from sklearn.metrics import mean_absolute_error
-            mae = mean_absolute_error(targets, outputs)
+            from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+            accuracy = accuracy_score(y_true, y_pred)
+            f1 = f1_score(y_true, y_pred)
+            precision = precision_score(y_true, y_pred)
+            recall = recall_score(y_true, y_pred)
 
         return {
             #'val_acc': np.round(correct / total, 3),
             'val_loss': np.round(np.mean(losses), 3),
-            'r2': r2,
-            'mse': mse,
-            'mae':mae,
+            'accuracy': accuracy,
+            'f1': f1,
+            'precision':precision,
+            'recall': recall,
         }
 
 
@@ -197,11 +200,13 @@ history = validate(model,
                    criterion=criterion)
 print('Before training: ', history)
 
-mse_losses = []
-r2_accuracies = []
-mae_losses = []
+val_losses = []
+accuracies = []
+f1_scores = []
+precision_scores = []
+recall_scores = []
 for epoch in range(NUM_EPOCHS):
-    train_history, mse_loss, r2 = train(model,
+    train_history = train(model,
                           train_dataloader,
                           device=DEVICE,
                           optimizer=optimizer,
@@ -211,9 +216,11 @@ for epoch in range(NUM_EPOCHS):
                            device=DEVICE,
                            criterion=criterion)
     print(f'Epoch {epoch}: {train_history} - {val_history} - time used:{time.time() - time_start}')
-    mse_losses.append(val_history['mse'])
-    r2_accuracies.append(val_history['r2'])
-    mae_losses.append(val_history['mae'])
+    val_losses.append(val_history['val_loss'])
+    accuracies.append(val_history['accuracy'])
+    f1_scores.append(val_history['f1'])
+    precision_scores.append(val_history['precision'])
+    recall_scores.append(val_history['recall'])
 
 
 # get time used
@@ -221,9 +228,9 @@ time_now = time.time()
 time_used = time_now - time_start
 
 # Losses
-nr = int(len(mse_losses))
+nr = int(len(val_losses))
 x_losses = list(range(nr))
-y_losses = mse_losses
+y_losses = val_losses
 
 plt.plot(x_losses, y_losses)
 plt.title('Losses over rounds\n'
@@ -234,9 +241,9 @@ plt.ylabel('MSE Loss')
 plt.savefig(f'images/losses_nonfl_{DATASET}.png')
 plt.show()
 
-nrr = int(len(r2_accuracies))
+nrr = int(len(accuracies))
 x_acc = list(range(nrr))
-y_acc = r2_accuracies
+y_acc = accuracies
 
 plt.plot(x_acc, y_acc, color='red')
 plt.title('Accuracy over rounds\n'
@@ -250,8 +257,9 @@ plt.show()
 print(f'batch size: {BATCH_SIZE}\n'
       f'epochs: {NUM_EPOCHS}\n'
       f'learning rate: {LEARNING_RATE}\n'
-      f'R2: {r2_accuracies[-1]}\n'
-      f'mse: {mse_losses[-1]}\n'
-      f'mae: {mae_losses[-1]}\n'
+      f'accuracy: {accuracies[-1]}\n'
+      f'f1: {f1_scores[-1]}\n'
+      f'precision: {precision_scores[-1]}\n'
+      f'recall: {recall_scores[-1]}\n'
       f'time used: {time_used}\n'
       f'optimizer: {OPTIMIZER}')

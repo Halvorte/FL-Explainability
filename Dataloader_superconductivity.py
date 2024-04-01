@@ -17,9 +17,6 @@ print(f'Missing values percentages: {missing_percentages}')
 duplicated_data = df.duplicated().sum()
 print(f'Duplicated rows: {duplicated_data}')
 
-# Remove country column
-#df = df.drop(['Country'], axis=1)
-#print(df)
 df = df.drop_duplicates()
 
 # fix spaces in column names
@@ -29,7 +26,6 @@ df.rename(columns=lambda x: x.replace(' ', ''), inplace=True)
 # Normalize the train data
 #scaler = StandardScaler()
 scaler = MinMaxScaler()
-#cols = df_train.columns[df_train.columns != ['Country', 'Year', 'Status', 'Life expectancy']]
 cols_to_normalize = [col for col in df.columns if col not in ['critical_temp']]
 df_normalized = df.copy()
 df_normalized[cols_to_normalize] = scaler.fit_transform(df_normalized[cols_to_normalize])
@@ -42,6 +38,13 @@ df_clean = df_normalized.dropna()
 
 # Split train test
 df_train, df_val = train_test_split(df_clean, test_size=0.2, random_state=42)
+
+# Split and save train data for DL model.Save training data without splitting
+DL_df_train = df_train.copy()
+train_X = DL_df_train.drop('critical_temp', axis=1)
+train_y = DL_df_train['critical_temp']
+np.save('data/DL_X_train.npy', train_X.to_numpy())
+np.save('data/DL_Y_train.npy', train_y.to_numpy())
 
 # Split val dataset into x and y, and save as npy files
 X_ = df_val.drop('critical_temp', axis=1)

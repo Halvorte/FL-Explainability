@@ -38,11 +38,11 @@ else:
     DEVICE = torch.device("cpu")
     print(f"Training on {DEVICE} using PyTorch {torch.__version__} and Flower {fl.__version__}")
 
-DATASET = 'aileron'
+DATASET = 'life_expectancy'
 NUM_CLIENTS = 5
 BATCH_SIZE = 32
-CLIENT_EPOCHS = 20
-NR_ROUNDS = 10   # nr of rounds the federated learning should do
+CLIENT_EPOCHS = 15
+NR_ROUNDS = 40   # nr of rounds the federated learning should do
 LEARNING_RATE = 0.0001
 OPTIMIZER = 'Adam'
 
@@ -101,7 +101,7 @@ def load_datasets():
         x = train_x_data[nr:(nr + i), :]
         y = train_y_data[nr:(nr + i)]
 
-        train_x_data_partial, test_x_data_partial, train_y_data_partial, test_y_data_partial = train_test_split(x, y, test_size=0.2, random_state=42)
+        train_x_data_partial, test_x_data_partial, train_y_data_partial, test_y_data_partial = train_test_split(x, y, test_size=0.3, random_state=42)
 
         train_x_data_tensor = torch.from_numpy(train_x_data_partial).type(torch.Tensor)
         train_y_data_tensor = torch.from_numpy(train_y_data_partial).type(torch.Tensor)
@@ -129,18 +129,22 @@ trainloaders, valloaders, testloader, num_features = load_datasets()
 class Net(nn.Module):
     def __init__(self, in_features: int, out_features: int) -> None:
         super(Net, self).__init__()
-        self.lin1 = nn.Linear(in_features, 128)
-        self.lin2 = nn.Linear(128, 64)
-        self.lin3 = nn.Linear(64, out_features)
+        self.lin1 = nn.Linear(in_features, 256)
+        self.lin2 = nn.Linear(256, 128)
+        self.lin3 = nn.Linear(128, out_features)
         self.rel = nn.ReLU()
         self.dropout = nn.Dropout(0.2)
+        #self.batch_norm1 = nn.BatchNorm1d(256)
+        #self.batch_norm2 = nn.BatchNorm1d(128)
 
     def forward(self, x):
         x = self.lin1(x)
+        #x = self.batch_norm1(x)
         x = self.rel(x)
         x = self.dropout(x)
 
         x = self.lin2(x)
+        #x = self.batch_norm2(x)
         x = self.rel(x)
         x = self.dropout(x)
 
@@ -233,6 +237,7 @@ def set_parameters(net, parameters: List[np.ndarray]):
     #print('set_parameters. state_dict')
     params_dict = zip(net.state_dict().keys(), parameters)
     state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+    #print(f'state_dict: {state_dict}')
     net.load_state_dict(state_dict, strict=True)
 
 class FlowerClient(fl.client.NumPyClient):
@@ -370,7 +375,7 @@ plt.title('Losses over rounds\n'
           f'{DATASET}')
 plt.xlabel('Rounds of federated learning')
 plt.ylabel('Loss')
-plt.ylim(0,0.04)
+plt.ylim(0,10)
 plt.savefig(f'images/losses_fl_{DATASET}.png')
 plt.show()
 

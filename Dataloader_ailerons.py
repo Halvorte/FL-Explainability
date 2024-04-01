@@ -40,7 +40,6 @@ np.save('data/DL_Y_train.npy', train_y.to_numpy())
 # Normalize the train data
 #scaler = StandardScaler()
 scaler = MinMaxScaler()
-#cols = df_train.columns[df_train.columns != ['Country', 'Year', 'Status', 'Life expectancy']]
 cols_to_normalize = [col for col in df.columns if col not in ['Goal']]
 df_normalized = df.copy()
 df_normalized[cols_to_normalize] = scaler.fit_transform(df_normalized[cols_to_normalize])
@@ -65,7 +64,7 @@ train_datasets = np.array_split(df_train, 5)
 #print(train_datasets)
 
 # Split the 5 datasets into x and y, and save in zip files
-clients = 1
+clients = 5
 client = 0
 
 for data in train_datasets:
