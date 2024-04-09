@@ -9,17 +9,15 @@ from collections import OrderedDict
 from typing import Dict, List, Optional, Tuple
 
 import time
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torchvision
-import torchvision.transforms as transforms
-from torch.utils.data import DataLoader, random_split
-from torchvision.datasets import CIFAR10
-from torchvision.datasets import ImageFolder
-from typing import Callable, Union
+#import torch.nn.functional as F
+#import torchvision
+#import torchvision.transforms as transforms
+from torch.utils.data import DataLoader
+from typing import Callable
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_squared_error
@@ -40,7 +38,7 @@ else:
 
 DATASET = 'aileron'
 NUM_CLIENTS = 5
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 CLIENT_EPOCHS = 20
 NR_ROUNDS = 10   # nr of rounds the federated learning should do
 LEARNING_RATE = 0.0001
@@ -270,7 +268,7 @@ def client_fn(cid: str) -> FlowerClient:
     # print(f'client_fn, train and valloader nr {int(cid)}')
 
     # Create a  single Flower client representing a single organization
-    return FlowerClient(net, trainloader, valloader).to_client()
+    return FlowerClient(net, trainloader, valloader)#.to_client()
 
 
 def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:

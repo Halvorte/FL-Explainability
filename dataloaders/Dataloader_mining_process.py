@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 import zipfile
 
 # Read the data
-df = pd.read_csv('data/winequality-red.csv')
+df = pd.read_csv('../data/MiningProcess_Flotation_Plant_Database.csv', decimal=",")
 print(df)
 
 # Empty row/ missing data handling
@@ -16,15 +16,17 @@ print(f'Missing values percentages: {missing_percentages}')
 
 # fix spaces in column names
 df.rename(columns=lambda x: x.replace(' ', ''), inplace=True)
-print(df)
+
+# Drop the date column
+df = df.drop(['date'], axis=1)
+df = df.drop(['%IronConcentrate'], axis=1)
 
 # Normalize the train data
 #scaler = StandardScaler()
 scaler = MinMaxScaler()
-cols_to_normalize = [col for col in df.columns if col not in ['quality']]
+cols_to_normalize = [col for col in df.columns if col not in ['%IronFeed', '%SilicaFeed', '%SilicaConcentrate']]
 df_normalized = df.copy()
 df_normalized[cols_to_normalize] = scaler.fit_transform(df_normalized[cols_to_normalize])
-
 
 # drop emty rows.
 # Can impute the values instead of removing in the future
@@ -35,32 +37,32 @@ df_train, df_val = train_test_split(df_clean, test_size=0.2, random_state=42)
 
 # Split and save train data for DL model.Save training data without splitting
 DL_df_train = df_train.copy()
-train_X = DL_df_train.drop('quality', axis=1)
-train_y = DL_df_train['quality']
-np.save('data/DL_X_train.npy', train_X.to_numpy())
-np.save('data/DL_Y_train.npy', train_y.to_numpy())
+train_X = DL_df_train.drop('%SilicaConcentrate', axis=1)
+train_y = DL_df_train['%SilicaConcentrate']
+np.save('../data/DL_X_train.npy', train_X.to_numpy())
+np.save('../data/DL_Y_train.npy', train_y.to_numpy())
 
 # Split val dataset into x and y, and save as npy files
-X_ = df_val.drop('quality', axis=1)
-Y_ = df_val['quality']
+X_ = df_val.drop('%SilicaConcentrate', axis=1)
+Y_ = df_val['%SilicaConcentrate']
 print(Y_.to_numpy())
 # Save X as X_test.npy
-np.save("data/X_test.npy", X_.to_numpy())
+np.save("../data/X_test.npy", X_.to_numpy())
 # Save Y as y_test.npy
-np.save("data/y_test.npy", Y_.to_numpy())
+np.save("../data/y_test.npy", Y_.to_numpy())
 print("Saved X_test and y_test as npy files successfully!")
 
 # split train into data for each runner
-clients = 1
+clients = 5
 train_datasets = np.array_split(df_train, clients)
 print(train_datasets)
 
 # Split the 5 datasets into x and y, and save in zip files
-clients = 1
 client = 0
 for data in train_datasets:
-    X = data[['fixedacidity', 'volatileacidity', 'citricacid', 'residualsugar', 'chlorides', 'freesulfurdioxide', 'totalsulfurdioxide', 'density', 'pH', 'sulphates', 'alcohol']]
-    Y = data['quality']
+    #data = train_datasets[i]
+    X = data[['%IronFeed', '%SilicaFeed', 'StarchFlow', 'AminaFlow', 'OrePulpFlow', 'OrePulppH', 'OrePulpDensity', 'FlotationColumn01AirFlow', 'FlotationColumn02AirFlow', 'FlotationColumn03AirFlow', 'FlotationColumn04AirFlow', 'FlotationColumn05AirFlow', 'FlotationColumn06AirFlow', 'FlotationColumn07AirFlow', 'FlotationColumn01Level', 'FlotationColumn02Level', 'FlotationColumn03Level', 'FlotationColumn04Level', 'FlotationColumn05Level', 'FlotationColumn06Level', 'FlotationColumn07Level']]
+    Y = data['%SilicaConcentrate']
 
     X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 
@@ -71,10 +73,10 @@ for data in train_datasets:
     print(f"Y_test shape: {y_test.shape}")
 
     # Save data as .npy files
-    np.save("X_train.npy", X_train)
-    np.save("X_test.npy", X_test)
-    np.save("Y_train.npy", y_train)
-    np.save("Y_test.npy", y_test)
+    np.save("../X_train.npy", X_train)
+    np.save("../X_test.npy", X_test)
+    np.save("../Y_train.npy", y_train)
+    np.save("../Y_test.npy", y_test)
 
     # Create a zip file and add the .npy files
     with zipfile.ZipFile(f"data/col{client}_data.zip", "w") as zip_f:

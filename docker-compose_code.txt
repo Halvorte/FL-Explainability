@@ -1,35 +1,7 @@
-version: "3.7"
-services:
-
-  aggregator_xai:
-    image: openfl_xai/aggregator
-    container_name: aggregator_xai
-    environment:
-      - PYTHONUNBUFFERED=1
-    
-  col0:
-    image: openfl_xai/collaborator
-    depends_on:
-     - aggregator_xai
-    container_name: col0
-    volumes:
-      - ./certificates/col0_cert_folder.zip:/current_workspace/col0_cert_folder.zip
-      - ./data/col0_data.zip:/current_workspace/data/col0_data.zip
-    command:
-      - /bin/sh
-      - -c
-      - |
-        unzip -n /current_workspace/col0_cert_folder.zip
-        unzip -o /current_workspace/data/col0_data.zip -d /current_workspace/data
-        python3 start_collaborator.py
-    environment:
-      - COLLABORATOR_NAME=col0
-      - PYTHONUNBUFFERED=1
-
   col1:
     image: openfl_xai/collaborator
     depends_on:
-      - aggregator_xai
+     - aggregator_xai
     container_name: col1
     volumes:
       - ./certificates/col1_cert_folder.zip:/current_workspace/col1_cert_folder.zip
@@ -49,7 +21,7 @@ services:
   col2:
     image: openfl_xai/collaborator
     depends_on:
-      - aggregator_xai
+     - aggregator_xai
     container_name: col2
     volumes:
       - ./certificates/col2_cert_folder.zip:/current_workspace/col2_cert_folder.zip
@@ -69,7 +41,7 @@ services:
   col3:
     image: openfl_xai/collaborator
     depends_on:
-      - aggregator_xai
+     - aggregator_xai
     container_name: col3
     volumes:
       - ./certificates/col3_cert_folder.zip:/current_workspace/col3_cert_folder.zip
@@ -89,7 +61,7 @@ services:
   col4:
     image: openfl_xai/collaborator
     depends_on:
-      - aggregator_xai
+     - aggregator_xai
     container_name: col4
     volumes:
       - ./certificates/col4_cert_folder.zip:/current_workspace/col4_cert_folder.zip

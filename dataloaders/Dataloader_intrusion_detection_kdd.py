@@ -8,7 +8,7 @@ from scipy.io import arff
 # Read the Pima Indians Diabetes dataset
 #arff_file = arff.loadarff('data/intrusion_detection_KDD/KDDTrain+_20Percent.arff')
 #df = pd.DataFrame(arff_file[0])
-df = pd.read_csv('data/intrusion_detection_KDD/KDDTrain+_20Percent.txt')
+df = pd.read_csv('../data/intrusion_detection_KDD/KDDTrain+_20Percent.txt')
 df = df[df.columns[:-1]]
 print(df.head())
 
@@ -77,21 +77,21 @@ df_train, df_val = train_test_split(df_clean, test_size=0.2, random_state=42)
 DL_df_train = df_train.copy()
 train_X = DL_df_train.drop('class', axis=1)
 train_y = DL_df_train['class']
-np.save('data/DL_X_train.npy', train_X.to_numpy())
-np.save('data/DL_Y_train.npy', train_y.to_numpy())
+np.save('../data/DL_X_train.npy', train_X.to_numpy())
+np.save('../data/DL_Y_train.npy', train_y.to_numpy())
 
 # Split val dataset into x and y, and save as npy files
 X_ = df_val.drop('class', axis=1)
 Y_ = df_val['class']
 print(Y_.to_numpy())
 # Save X as X_test.npy
-np.save("data/X_test.npy", X_.to_numpy())
+np.save("../data/X_test.npy", X_.to_numpy())
 # Save Y as y_test.npy
-np.save("data/y_test.npy", Y_.to_numpy())
+np.save("../data/y_test.npy", Y_.to_numpy())
 print("Saved X_test and y_test as npy files successfully!")
 
 # split train into data for each runner
-clients = 5
+clients = 1
 train_datasets = np.array_split(df_train, clients)
 print(train_datasets)
 
@@ -118,10 +118,10 @@ for data in train_datasets:
     print(f"Y_test shape: {y_test.shape}")
 
     # Save data as .npy files
-    np.save("X_train.npy", X_train)
-    np.save("X_test.npy", X_test)
-    np.save("Y_train.npy", y_train)
-    np.save("Y_test.npy", y_test)
+    np.save("../X_train.npy", X_train)
+    np.save("../X_test.npy", X_test)
+    np.save("../Y_train.npy", y_train)
+    np.save("../Y_test.npy", y_test)
 
     # Create a zip file and add the .npy files
     with zipfile.ZipFile(f"data/col{client}_data.zip", "w") as zip_f:
