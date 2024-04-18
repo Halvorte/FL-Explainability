@@ -181,6 +181,9 @@ class FuzzySystem:
                 membership_value = fuzzy_set.get_value(value)
                 activations_values.append(membership_value)
 
+            # this rules activation values:
+            # remove 0s and 1s from the activation values
+            activations_values = [element for element in activations_values if element != 0]
             rule_firing_strength = 0
             if t_norm == 'min':
                 rule_firing_strength = min(activations_values)

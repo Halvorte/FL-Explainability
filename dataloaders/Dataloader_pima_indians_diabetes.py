@@ -4,6 +4,18 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 import zipfile
 
+
+def get_dataset_type():
+    dataset_type = 'classification'
+    return dataset_type
+
+def is_classifier():
+    return True
+
+def get_dataset_name():
+    name = 'pima_indians_diabetes'
+    return name
+
 def get_clean_dataset():
     # Read the Pima Indians Diabetes dataset
     df = pd.read_csv('../data/diabetes.csv')
@@ -35,7 +47,7 @@ def get_clean_dataset():
     df_clean = df_normalized.dropna()
     return df_clean
 
-def data_experiment_function(df_train, df_val, X_featrues, y_feature, experiment, clients=5, client_split=0.2):
+def data_experiment_function(df_train, df_val, X_featrues, y_feature, experiment, clients, client_split=0.2):
     # Split train test
     #df_train, df_val = train_test_split(df_clean, test_size=client_split, random_state=42)
 
@@ -78,17 +90,17 @@ def data_experiment_function(df_train, df_val, X_featrues, y_feature, experiment
         print(f"Y_test shape: {y_test.shape}")
 
         # Save data as .npy files
-        np.save("../X_train.npy", X_train)
-        np.save("../X_test.npy", X_test)
-        np.save("../Y_train.npy", y_train)
-        np.save("../Y_test.npy", y_test)
+        np.save("X_train.npy", X_train)
+        np.save("X_test.npy", X_test)
+        np.save("Y_train.npy", y_train)
+        np.save("Y_test.npy", y_test)
 
         # Create a zip file and add the .npy files
         with zipfile.ZipFile(f"../data/col{client}_data.zip", "w") as zip_f:
-            zip_f.write("../X_train.npy")
-            zip_f.write("../X_test.npy")
-            zip_f.write("../y_train.npy")
-            zip_f.write("../y_test.npy")
+            zip_f.write("X_train.npy")
+            zip_f.write("X_test.npy")
+            zip_f.write("y_train.npy")
+            zip_f.write("y_test.npy")
 
         print(f"Data saved to col{client}_data.zip successfully!")
         client += 1
@@ -101,9 +113,9 @@ def get_data_features():
     return X, y
 
 # If not using run experiment file and just want to run once
-clean_data = get_clean_dataset()
+#clean_data = get_clean_dataset()
 # Split train test
-df_train, df_val = train_test_split(clean_data, test_size=0.2, random_state=42)
+#df_train, df_val = train_test_split(clean_data, test_size=0.2, random_state=42)
 
 #DL_df_train = df_train.copy()
 ##train_X = DL_df_train.drop('Outcome', axis=1)
@@ -111,8 +123,8 @@ df_train, df_val = train_test_split(clean_data, test_size=0.2, random_state=42)
 
 
 
-X_features, y_features = get_data_features()
+#X_features, y_features = get_data_features()
 #X = clean_data[X_features]
 #y = clean_data[y_features]
 
-data_experiment_function(df_train, df_val, X_features, y_features, experiment=False)
+#data_experiment_function(df_train, df_val, X_features, y_features, experiment=False)
