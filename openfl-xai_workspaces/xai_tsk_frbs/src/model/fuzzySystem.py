@@ -282,20 +282,28 @@ class FuzzySystem:
         """
 
         firing_strengths = self.get_firing_strengths(input_vector=input_vector)
+        #print(f'Firing strengths: {firing_strengths}')
 
         is_all_zero = np.all((firing_strengths == 0))
         if is_all_zero:
             _, consequent_weights, index_max_rules = self.__get_rule_maximum_weight()
         else:
             max_values_firing = firing_strengths.max()
+            #print(f'max_values_firing: {max_values_firing}')
             index_same_firing_strengths = np.where(firing_strengths == max_values_firing)[0]
 
             # Retrieve the relative weights
+            #print(f'index score: {index_same_firing_strengths}')
+            #print(f'len rule weights: {len(self._rule_weights)}')
+            #print(f'self rule weights: {self._rule_weights}')
+
             rule_weight = self._rule_weights[index_same_firing_strengths]
 
             index_max_rules = index_same_firing_strengths[rule_weight.argmax()]
 
             consequent_weights = self._consequents[index_max_rules]
+            #print(f'self.consequents: {self._consequents}')
+            #print(f'Consequent weights: {consequent_weights}')
 
         self._counter_activation[index_max_rules] += 1
 
@@ -305,6 +313,10 @@ class FuzzySystem:
             w0 = consequent_weights[0]
 
             consequent_weights = consequent_weights[1:]
+
+            #print(f'w0: {w0}')
+            #print(f'consequent_weights: {consequent_weights}')
+            #print(f'Input vector: {input_vector}')
 
             result = (consequent_weights * input_vector).sum() + w0
         else:

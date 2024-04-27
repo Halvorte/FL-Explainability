@@ -1,7 +1,7 @@
 import json
 import numpy as np
 
-f = open('experiment_results2.txt', 'r')
+f = open('experiment_results_1client.txt', 'r')
 #print(f.read())
 data = f.read()
 #print(data)
@@ -37,7 +37,10 @@ for i in data_json:
         lower_bound = mean_performance - margin_of_error
         upper_bound = mean_performance + margin_of_error
 
-        res = [mean_performance, sample_std, (upper_bound, lower_bound)]
+        #confidence_interval_percentage = margin_of_error * 100
+        confidence_interval_percentage = margin_of_error
+
+        res = [mean_performance, sample_std, (upper_bound, lower_bound), confidence_interval_percentage]
         one_result[j] = res
 
         # Print the results
@@ -47,21 +50,10 @@ for i in data_json:
 
     dataset_results.append(one_result)
 
+
+# Print the results
+# for regression datasets it is; 1:R2, 2:MSE, 3:MAE, 4:nr rules
+# for binary classification it is; 1:Accuracy, 2:F1, 3:Precision, 4:Recall, 5:nr ruels
 for k in dataset_results:
     print(k)
-#print(dataset_results)
-
-'''
-    averages = []
-    for j in range(len(lists[0])):
-        tot_sum = 0
-        for sublist in lists:
-            value = float(sublist[j])
-            #tot_sum += int(sublist[j])
-            tot_sum += value
-        avg = tot_sum / len(lists)
-        averages.append(avg)
-
-    dataset_results.append(averages)
-'''
 #print(dataset_results)

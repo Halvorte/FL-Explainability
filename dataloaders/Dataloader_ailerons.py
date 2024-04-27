@@ -65,6 +65,7 @@ def data_experiment_function(df_train, df_val, X_featrues, y_feature, experiment
     np.save('../data/DL_Y_train.npy', train_y.to_numpy())
 
     # Split val dataset into x and y, and save as npy files
+    # This is the data the global models are tested using
     X_ = df_val.drop(y_feature, axis=1)
     Y_ = df_val[y_feature]
     print(Y_.to_numpy())

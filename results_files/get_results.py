@@ -20,12 +20,18 @@ import importlib
 
 
 def get_model_results(feature_names, classifier):
+    #from openfl-xai_workspaces/xai_tsk_frbs/src/model/fuzzySystem.py import FuzzySystem
+
+    #fuzz_module = fuzzySystem
+    #fuzz_module = importlib.import_module("C:\Users\Halvor\Documents\Code\FL-Explainability\openfl-xai_workspaces\xai_tsk_frbs\src\model\fuzzySystem.py")
     fuzz_module = importlib.import_module("openfl-xai_workspaces.xai_tsk_frbs.src.model.fuzzySystem")
     fuzzySystem_class = getattr(fuzz_module, "FuzzySystem")
 
     antecedents = np.load("../global_models/tsk/TSK_global_model_rules_antec.npy")
     consequents = np.load("../global_models/tsk/TSK_global_model_rules_conseq.npy")
     weights = np.load("../global_models/tsk/TSK_global_model_weights.npy")
+
+    print(f'antecedents shape: {antecedents.shape}')
 
 
     model = fuzzySystem_class(variable_names=feature_names,
@@ -50,7 +56,10 @@ def get_model_results(feature_names, classifier):
 
     X_test = np.load("../data/X_test.npy")
     y_true = np.load("../data/y_test.npy")
-    y_pred_and_activated_rules_samples = model.predict_and_get_rule(X_test) #
+    print(f'len feature_names: {len(feature_names)}')
+    print(f'len data: {len(X_test)}')
+    print(f'X_test shape: {X_test.shape}')
+    y_pred_and_activated_rules_samples = model.predict_and_get_rule(X_test)
     y_pred = [tup[0] for tup in y_pred_and_activated_rules_samples]
     activated_rules = [tup[1] for tup in y_pred_and_activated_rules_samples]
 
