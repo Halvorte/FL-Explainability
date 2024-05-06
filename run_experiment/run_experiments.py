@@ -151,12 +151,13 @@ def get_model_results(feature_names, classifier):
 #files = [dataloaders.Dataloader_ailerons, dataloaders.Dataloader_combined_cycle_power_plant, dataloaders.Dataloader_creditcard_fraud, dataloaders.Dataloader_intrusion_detection_kdd, dataloaders.Dataloader_life_expectancy, dataloaders.Dataloader_maintenance_naval_propulsion, dataloaders.Dataloader_pima_indians_diabetes, dataloaders.Dataloader_smart_grid_stability, dataloaders.Dataloader_superconductivity, dataloaders.Dataloading_wine_quality]
 
 #files = [dataloaders.Dataloading_wine_quality]
-files = [dataloaders.Dataloader_life_expectancy]
+files = [dataloaders.Dataloader_ailerons]
 #files = [dataloaders.Dataloader_combined_cycle_power_plant]
 #files = [dataloaders.Dataloader_life_expectancy]
 #files = [dataloaders.Dataloader_pima_indians_diabetes]
 #files = [dataloaders.Dataloader_pima_indians_diabetes, dataloaders.Dataloader_combined_cycle_power_plant]
-#files = [dataloaders.Dataloader_superconductivity, dataloaders.Dataloading_wine_quality]
+#files = [dataloaders.Dataloader_superconductivity, dataloaders.Dataloader_combined_cycle_power_plant]
+#files = [dataloaders.Dataloader_superconductivity]
 
 #test_file_ = dataloaders.Dataloader_pima_indians_diabetes
 

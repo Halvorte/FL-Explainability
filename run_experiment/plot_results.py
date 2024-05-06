@@ -25,7 +25,7 @@ def plot_selected_regression_data(dictionary, entry):
 
 
 def read_data_from_file():
-    with open('experiment_plots_5clients.txt', 'r') as file:
+    with open('experiment_plots_testing.txt', 'r') as file:
         contents = file.read()
 
     #lines = contents.split('\n')
@@ -70,5 +70,5 @@ def read_data_from_file():
 data = read_data_from_file()
 
 # plot a selected dictionary entry
-entry = 'superconductivity87'
+entry = 'wine_quality5'
 plot_selected_regression_data(data, entry)
