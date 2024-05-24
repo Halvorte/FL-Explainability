@@ -25,41 +25,12 @@ from sklearn.metrics import r2_score
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
-
+from sklearn.model_selection import KFold
 import flwr as fl
 from flwr.common import Metrics
 
-torch.cuda.empty_cache()
-
-if torch.cuda.is_available():
-    #DEVICE = torch.device("cuda")  # Try "cuda" to train on GPU
-    DEVICE = torch.device("cpu")
-    print(f"Training on {DEVICE} using PyTorch {torch.__version__} and Flower {fl.__version__}")
-else:
-    DEVICE = torch.device("cpu")
-    print(f"Training on {DEVICE} using PyTorch {torch.__version__} and Flower {fl.__version__}")
-
-DATASET = 'pima_indians_diabetes'
-NUM_CLIENTS = 5
-BATCH_SIZE = 32
-CLIENT_EPOCHS = 55
-NR_ROUNDS = 50   # nr of rounds the federated learning should do
-LEARNING_RATE = 0.001
-OPTIMIZER = 'Adam'
-
-TIME = time.time()
-TIME_ = time.time()
-
-accuracies_ = []
-losses = []
-f1_scores_ = []
-precision_scores_ = []
-recall_scores_ = []
-time_used = []
-
-predicted_ = []
-true_ = []
-
+import dataloaders.Dataloader_pima_indians_diabetes
+from sklearn.model_selection import train_test_split
 
 # Get the new dataset for Brain tumor MRI scans
 def load_datasets():
@@ -126,8 +97,6 @@ def load_datasets():
     return trainloaders, valloaders, testloader, num_features
 
 
-trainloaders, valloaders, testloader, num_features = load_datasets()
-
 
 class Net(nn.Module):
     def __init__(self, in_features: int, out_features: int) -> None:
@@ -146,17 +115,6 @@ class Net(nn.Module):
         x = self.sigmoid(x)
         return x
 
-NUM_FEATURES = num_features
-print(f'Num features: {NUM_FEATURES}')
-OUT_FEATURES = 1
-model = Net(NUM_FEATURES, OUT_FEATURES)
-criterion = nn.MSELoss()      # Mean Square error loss function
-#criterion = nn.Sigmoid()
-if OPTIMIZER == 'Adam':
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)    # Adam optimizer
-else:
-    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)     # Stochatic Gradient Descent
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, verbose=True)
 
 def train(net, trainloader, epochs: int, verbose=False):
     """Train the network on the training set."""
@@ -354,95 +312,209 @@ def get_on_fit_config_fn() -> Callable[[int], Dict[str, str]]:
     return fit_config
 
 
-# Create FedAvg strategy
-strategy = fl.server.strategy.FedAvg(
-    # strategy = fl.server.strategy.FedAdagrad(
-    # Fraction_fit means how many of the clients participate every round. 1.0 = 100%, 0.5 = 50%
-    fraction_fit=1.0,
-    fraction_evaluate=0.5,  # percentage of clients randomly selected for evaluation
-    min_fit_clients=NUM_CLIENTS,  # could be lower than num_clients
-    # min_fit_clients=5,
-    min_evaluate_clients=NUM_CLIENTS,
-    # min_evaluate_clients=10,
-    min_available_clients=NUM_CLIENTS,
-    # min_available_clients=10,   # Wait until 10 clients are available should be NUM_CLIENTS
-    evaluate_metrics_aggregation_fn=weighted_average,  # <-- pass the metric aggregation function
-    evaluate_fn=evaluate,
-    on_fit_config_fn=get_on_fit_config_fn(),
-    # initial_parameters=fl.common.ndarrays_to_parameters(get_parameters(Net())), # used for FedAdagrad
-)
+dataset_name = dataloaders.Dataloader_pima_indians_diabetes.get_dataset_name()
+# Run dataloader file to make data available.
+clean_data_df = dataloaders.Dataloader_pima_indians_diabetes.get_clean_dataset()
+X_feature, y_feature = dataloaders.Dataloader_pima_indians_diabetes.get_data_features()
 
-# Specify client resources if you need GPU (defaults to 1 CPU and 0 GPU)
-client_resources = None
-if DEVICE.type == "cuda":
-    client_resources = {"num_gpus": 1}
-    print('cuda?')
+kf = KFold(n_splits=10, shuffle=True, random_state=42)
 
-# Start simulation
-fl.simulation.start_simulation(
-    client_fn=client_fn,
-    num_clients=NUM_CLIENTS,
-    config=fl.server.ServerConfig(num_rounds=NR_ROUNDS),  # num_rounds = 10
-    strategy=strategy,
-    client_resources=client_resources,
-)
+results = []
 
-import matplotlib.pyplot as plt
-import numpy as np
+# loop through the folds
+for train_index, test_index in kf.split(clean_data_df):
+    print(f'fold, train_set:{len(train_index)}, test_set: {len(test_index)}')
+
+    df_train = clean_data_df.iloc[train_index]
+    df_test = clean_data_df.iloc[test_index]
+
+    # save data in correct folders for project
+    dataloaders.Dataloader_pima_indians_diabetes.dl_dataloading(df_train, df_test, X_feature, y_feature)
 
 
-# Losses
-nr = int(len(losses))
-x_losses = list(range(nr))
-y_losses = losses
+    # Run dataloader file to make data available.
+    #clean_data_df = dataloaders.Dataloader_pima_indians_diabetes.get_clean_dataset()
+    #X_feature, y_feature = dataloaders.Dataloader_pima_indians_diabetes.get_data_features()
 
-plt.plot(x_losses, y_losses)
-plt.title('Losses over rounds\n'
-          f'{DATASET}')
-plt.xlabel('Rounds of federated learning')
-plt.ylabel('Loss')
-plt.ylim(0,0.05)
-plt.savefig(f'images/losses_fl_{DATASET}.png')
-plt.show()
+    # split train and val
+    #df_train, df_val = train_test_split(clean_data_df, test_size=0.2, random_state=42)
 
-# Accuracy
-nrr = int(len(accuracies_))
-x_acc = list(range(nrr))
-y_acc = accuracies_
+    #dataloaders.Dataloader_pima_indians_diabetes.dl_dataloading(df_train, df_val, X_feature, y_feature)
 
-plt.plot(x_acc, y_acc, color='red')
-plt.title('Accuracy over rounds\n'
-          f'{DATASET}')
-plt.xlabel('Rounds of federated learning')
-plt.ylabel('Accuracy')
-plt.ylim(0,1.1)
-plt.savefig(f'images/accuracy_fl_{DATASET}.png')
-plt.show()
+    torch.cuda.empty_cache()
 
-# f1-Accuracy
-nrrr = int(len(f1_scores_))
-x_accc = list(range(nrrr))
-y_accc = f1_scores_
+    if torch.cuda.is_available():
+        #DEVICE = torch.device("cuda")  # Try "cuda" to train on GPU
+        DEVICE = torch.device("cpu")
+        print(f"Training on {DEVICE} using PyTorch {torch.__version__} and Flower {fl.__version__}")
+    else:
+        DEVICE = torch.device("cpu")
+        print(f"Training on {DEVICE} using PyTorch {torch.__version__} and Flower {fl.__version__}")
 
-plt.plot(x_accc, y_accc, color='red')
-plt.title('F1-Accuracy over rounds\n'
-          f'{DATASET}')
-plt.xlabel('Rounds of federated learning')
-plt.ylabel('f1-Accuracy')
-plt.ylim(0,1.1)
-#plt.savefig(f'images/accuracy_fl_{DATASET}.png')
-plt.show()
+    DATASET = 'pima_indians_diabetes'
+    NUM_CLIENTS = 5
+    BATCH_SIZE = 32
+    CLIENT_EPOCHS = 55
+    NR_ROUNDS = 50   # nr of rounds the federated learning should do
+    LEARNING_RATE = 0.001
+    OPTIMIZER = 'Adam'
+
+    TIME = time.time()
+    TIME_ = time.time()
+
+    accuracies_ = []
+    losses = []
+    f1_scores_ = []
+    precision_scores_ = []
+    recall_scores_ = []
+    time_used = []
+
+    predicted_ = []
+    true_ = []
 
 
-print(f'nr of clients: {NUM_CLIENTS}\n'
-      f'batch size: {BATCH_SIZE}\n'
-      f'client epochs: {CLIENT_EPOCHS}\n'
-      f'nr of federated rounds: {NR_ROUNDS}\n'
-      f'learning rate: {LEARNING_RATE}\n'
-      f'optimizer: {OPTIMIZER}\n'
-      f'accuracy: {accuracies_[-1]}\n'
-      f'MSE: {losses[-1]}\n'
-      f'f1: {f1_scores_[-1]}\n'
-      f'precision: {precision_scores_[-1]}\n'
-      f'recall: {recall_scores_[-1]}\n'
-      f'Time_used: {time_used[-1]}')
+
+
+
+    trainloaders, valloaders, testloader, num_features = load_datasets()
+
+
+
+
+    NUM_FEATURES = num_features
+    print(f'Num features: {NUM_FEATURES}')
+    OUT_FEATURES = 1
+    model = Net(NUM_FEATURES, OUT_FEATURES)
+    criterion = nn.MSELoss()      # Mean Square error loss function
+    #criterion = nn.Sigmoid()
+    if OPTIMIZER == 'Adam':
+        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)    # Adam optimizer
+    else:
+        optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)     # Stochatic Gradient Descent
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, verbose=True)
+
+
+
+
+    # Create FedAvg strategy
+    strategy = fl.server.strategy.FedAvg(
+        # strategy = fl.server.strategy.FedAdagrad(
+        # Fraction_fit means how many of the clients participate every round. 1.0 = 100%, 0.5 = 50%
+        fraction_fit=1.0,
+        fraction_evaluate=0.5,  # percentage of clients randomly selected for evaluation
+        min_fit_clients=NUM_CLIENTS,  # could be lower than num_clients
+        # min_fit_clients=5,
+        min_evaluate_clients=NUM_CLIENTS,
+        # min_evaluate_clients=10,
+        min_available_clients=NUM_CLIENTS,
+        # min_available_clients=10,   # Wait until 10 clients are available should be NUM_CLIENTS
+        evaluate_metrics_aggregation_fn=weighted_average,  # <-- pass the metric aggregation function
+        evaluate_fn=evaluate,
+        on_fit_config_fn=get_on_fit_config_fn(),
+        # initial_parameters=fl.common.ndarrays_to_parameters(get_parameters(Net())), # used for FedAdagrad
+    )
+
+    # Specify client resources if you need GPU (defaults to 1 CPU and 0 GPU)
+    client_resources = None
+    if DEVICE.type == "cuda":
+        client_resources = {"num_gpus": 1}
+        print('cuda?')
+
+    # Start simulation
+    fl.simulation.start_simulation(
+        client_fn=client_fn,
+        num_clients=NUM_CLIENTS,
+        config=fl.server.ServerConfig(num_rounds=NR_ROUNDS),  # num_rounds = 10
+        strategy=strategy,
+        client_resources=client_resources,
+    )
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+
+    # Losses
+    nr = int(len(losses))
+    x_losses = list(range(nr))
+    y_losses = losses
+
+    plt.plot(x_losses, y_losses)
+    plt.title('Losses over rounds\n'
+              f'{DATASET}')
+    plt.xlabel('Rounds of federated learning')
+    plt.ylabel('Loss')
+    plt.ylim(0,0.05)
+    plt.savefig(f'../images/losses_fl_{DATASET}.png')
+    plt.show()
+
+    # Accuracy
+    nrr = int(len(accuracies_))
+    x_acc = list(range(nrr))
+    y_acc = accuracies_
+
+    plt.plot(x_acc, y_acc, color='red')
+    plt.title('Accuracy over rounds\n'
+              f'{DATASET}')
+    plt.xlabel('Rounds of federated learning')
+    plt.ylabel('Accuracy')
+    plt.ylim(0,1.1)
+    plt.savefig(f'../images/accuracy_fl_{DATASET}.png')
+    plt.show()
+
+    # f1-Accuracy
+    nrrr = int(len(f1_scores_))
+    x_accc = list(range(nrrr))
+    y_accc = f1_scores_
+
+    plt.plot(x_accc, y_accc, color='red')
+    plt.title('F1-Accuracy over rounds\n'
+              f'{DATASET}')
+    plt.xlabel('Rounds of federated learning')
+    plt.ylabel('f1-Accuracy')
+    plt.ylim(0,1.1)
+    #plt.savefig(f'images/accuracy_fl_{DATASET}.png')
+    plt.show()
+
+
+    print(f'nr of clients: {NUM_CLIENTS}\n'
+          f'batch size: {BATCH_SIZE}\n'
+          f'client epochs: {CLIENT_EPOCHS}\n'
+          f'nr of federated rounds: {NR_ROUNDS}\n'
+          f'learning rate: {LEARNING_RATE}\n'
+          f'optimizer: {OPTIMIZER}\n'
+          f'accuracy: {accuracies_[-1]}\n'
+          f'MSE: {losses[-1]}\n'
+          f'f1: {f1_scores_[-1]}\n'
+          f'precision: {precision_scores_[-1]}\n'
+          f'recall: {recall_scores_[-1]}\n'
+          f'Time_used: {time_used[-1]}')
+
+    # Add results
+    results_dict = {'dataset': dataset_name, 'accuracy': accuracies_[-1], 'precision': precision_scores_[-1], 'recall': recall_scores_[-1]}
+    results.append(results_dict)
+
+print(results)
+
+# calculate mean results and 90% confidence interval
+# Extract R2 values from each dictionary
+accuracies = [d['accuracy'] for d in results]
+mean_accuracy = np.mean(accuracies)
+std_accuracy = np.std(accuracies)
+z_score = 1.645 # Define z-score for 90% confidence interval (around 1.645)
+margin_of_error = z_score * std_accuracy # Calculate the margin of error
+
+
+precision_values = [d['precision'] for d in results]
+mean_precision = np.mean(precision_values)
+std_precision = np.std(precision_values)
+margin_of_error_precision = z_score * std_precision # Calculate the margin of error
+
+recall_values = [d['recall'] for d in results]
+mean_recall = np.mean(recall_values)
+std_recall = np.std(recall_values)
+margin_of_error_recall = z_score * std_recall # Calculate the margin of error
+
+
+print(f"mean accuracy: {mean_accuracy}, margin: {margin_of_error}")
+print(f"mean precission: {mean_precision}, margin: {margin_of_error_precision}")
+print(f"mean MAE: {mean_recall}, margin: {margin_of_error_recall}")

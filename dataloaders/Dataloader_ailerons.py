@@ -50,6 +50,25 @@ def get_clean_dataset():
     return df_clean
 
 
+def dl_dataloading(df_train, df_val, X_featrues, y_feature):
+    # Split and save train data for DL model.Save training data without splitting
+    DL_df_train = df_train.copy()
+    train_X = DL_df_train.drop(y_feature, axis=1)
+    train_y = DL_df_train[y_feature]
+    np.save('../data/DL_X_train.npy', train_X.to_numpy())
+    np.save('../data/DL_Y_train.npy', train_y.to_numpy())
+
+    # Split val dataset into x and y, and save as npy files
+    X_ = df_val.drop(y_feature, axis=1)
+    Y_ = df_val[y_feature]
+    print(Y_.to_numpy())
+    # Save X as X_test.npy
+    np.save("../data/X_test.npy", X_.to_numpy())
+    # Save Y as y_test.npy
+    np.save("../data/y_test.npy", Y_.to_numpy())
+    print("Saved X_test and y_test as npy files successfully!")
+
+
 def data_experiment_function(df_train, df_val, X_featrues, y_feature, experiment, clients, client_split=0.2):
     # Split train test
     #df_train, df_val = train_test_split(df_normalized, test_size=0.2, random_state=42)

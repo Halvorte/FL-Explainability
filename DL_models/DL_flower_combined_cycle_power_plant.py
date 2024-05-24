@@ -27,31 +27,9 @@ from sklearn.metrics import mean_absolute_error
 
 import flwr as fl
 from flwr.common import Metrics
-
-torch.cuda.empty_cache()
-
-if torch.cuda.is_available():
-    #DEVICE = torch.device("cuda")  # Try "cuda" to train on GPU
-    DEVICE = torch.device("cpu")
-    print(f"Training on {DEVICE} using PyTorch {torch.__version__} and Flower {fl.__version__}")
-else:
-    DEVICE = torch.device("cpu")
-    print(f"Training on {DEVICE} using PyTorch {torch.__version__} and Flower {fl.__version__}")
-
-NUM_CLIENTS = 5
-BATCH_SIZE = 32
-CLIENT_EPOCHS = 100
-NR_ROUNDS = 10   # nr of rounds the federated learning should do
-LEARNING_RATE = 0.0001
-
-TIME = time.time()
-TIME_ = time.time()
-
-accuracies = []
-losses = []
-
-predicted_ = []
-true_ = []
+import dataloaders.Dataloader_combined_cycle_power_plant
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold
 
 
 # Get the new dataset for Brain tumor MRI scans
@@ -119,9 +97,6 @@ def load_datasets():
     return trainloaders, valloaders, testloader, num_features
 
 
-trainloaders, valloaders, testloader, num_features = load_datasets()
-
-
 class Net(nn.Module):
     def __init__(self, in_features: int, out_features: int) -> None:
         super(Net, self).__init__()
@@ -137,15 +112,7 @@ class Net(nn.Module):
         x = self.lin2(x)
         return x
 
-NUM_FEATURES = num_features
-print(f'Number of features: {NUM_FEATURES}')
-OUT_FEATURES = 1
-model = Net(NUM_FEATURES, OUT_FEATURES)
-criterion = nn.MSELoss()      # Mean Square error loss function
-#criterion = nn.Sigmoid()
-#optimizer = optim.Adam(model.parameters(), LEARNING_RATE)    # Adam optimizer
-optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)     # Stochatic Gradient Descent
-#scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, verbose=True)
+
 
 def train(net, trainloader, epochs: int, verbose=False):
     """Train the network on the training set."""
@@ -284,6 +251,7 @@ def evaluate(
     print(f"Server-side evaluation loss {loss} / r2-accuracy {r2_accuracy}, mse {mse_accuracy}, mae {mae_accuracy}, round {server_round}")
     accuracies.append(r2_accuracy)
     losses.append(loss)
+    mae_losses.append(mae_accuracy)
     time_now = time.time()
     time_sofar = time_now - TIME
     #time_used = time_now - TIME_
@@ -307,77 +275,183 @@ def get_on_fit_config_fn() -> Callable[[int], Dict[str, str]]:
 
     return fit_config
 
+dataset_name = dataloaders.Dataloader_combined_cycle_power_plant.get_dataset_name()
+# Run dataloader file to make data available.
+clean_data_df = dataloaders.Dataloader_combined_cycle_power_plant.get_clean_dataset()
+X_feature, y_feature = dataloaders.Dataloader_combined_cycle_power_plant.get_data_features()
 
-# Create FedAvg strategy
-strategy = fl.server.strategy.FedAvg(
-    # strategy = fl.server.strategy.FedAdagrad(
-    # Fraction_fit means how many of the clients participate every round. 1.0 = 100%, 0.5 = 50%
-    fraction_fit=1.0,
-    fraction_evaluate=0.5,  # percentage of clients randomly selected for evaluation
-    min_fit_clients=NUM_CLIENTS,  # could be lower than num_clients
-    # min_fit_clients=5,
-    min_evaluate_clients=NUM_CLIENTS,
-    # min_evaluate_clients=10,
-    min_available_clients=NUM_CLIENTS,
-    # min_available_clients=10,   # Wait until 10 clients are available should be NUM_CLIENTS
-    evaluate_metrics_aggregation_fn=weighted_average,  # <-- pass the metric aggregation function
-    evaluate_fn=evaluate,
-    on_fit_config_fn=get_on_fit_config_fn(),
-    # initial_parameters=fl.common.ndarrays_to_parameters(get_parameters(Net())), # used for FedAdagrad
-)
+kf = KFold(n_splits=10, shuffle=True, random_state=42)
 
-# Specify client resources if you need GPU (defaults to 1 CPU and 0 GPU)
-client_resources = None
-if DEVICE.type == "cuda":
-    client_resources = {"num_gpus": 1}
-    print('cuda?')
+results = []
 
-# print('Yo got here!')
+# loop through the folds
+for train_index, test_index in kf.split(clean_data_df):
+    print(f'fold, train_set:{len(train_index)}, test_set: {len(test_index)}')
 
-# Start simulation
-fl.simulation.start_simulation(
-    client_fn=client_fn,
-    num_clients=NUM_CLIENTS,
-    config=fl.server.ServerConfig(num_rounds=NR_ROUNDS),  # num_rounds = 10
-    strategy=strategy,
-    client_resources=client_resources,
-)
+    df_train = clean_data_df.iloc[train_index]
+    df_test = clean_data_df.iloc[test_index]
 
-import matplotlib.pyplot as plt
-import numpy as np
+    # save data in correct folders for project
+    dataloaders.Dataloader_combined_cycle_power_plant.dl_dataloading(df_train, df_test, X_feature, y_feature)
 
 
-# Losses
-nr = int(len(losses))
-x_losses = list(range(nr))
-y_losses = losses
+    # Run dataloader file to make data available.
+    #clean_data_df = dataloaders.Dataloader_combined_cycle_power_plant.get_clean_dataset()
+    #X_feature, y_feature = dataloaders.Dataloader_combined_cycle_power_plant.get_data_features()
 
-plt.plot(x_losses, y_losses)
-plt.title('Losses over rounds\n'
-          'Combined Cycle Power Plant')
-plt.xlabel('Rounds of federated learning')
-plt.ylabel('Loss')
-plt.ylim(0,20)
-plt.savefig('images/losses_fl_combined_cycle_power_plant.png')
-plt.show()
+    # split train and val
+    #df_train, df_val = train_test_split(clean_data_df, test_size=0.2, random_state=42)
 
-# Accuracy
-nrr = int(len(accuracies))
-x_acc = list(range(nrr))
-y_acc = accuracies
+    #dataloaders.Dataloader_combined_cycle_power_plant.dl_dataloading(df_train, df_val, X_feature, y_feature)
 
-plt.plot(x_acc, y_acc, color='red')
-plt.title('R2-Accuracy over rounds\n'
-          'Combined Cycle Power Plant')
-plt.xlabel('Rounds of federated learning')
-plt.ylabel('Accuracy')
-plt.ylim(0,1.1)
-plt.savefig('images/r2_accuracy_fl_combined_cycle_power_plant.png')
-plt.show()
+    torch.cuda.empty_cache()
+
+    if torch.cuda.is_available():
+        #DEVICE = torch.device("cuda")  # Try "cuda" to train on GPU
+        DEVICE = torch.device("cpu")
+        print(f"Training on {DEVICE} using PyTorch {torch.__version__} and Flower {fl.__version__}")
+    else:
+        DEVICE = torch.device("cpu")
+        print(f"Training on {DEVICE} using PyTorch {torch.__version__} and Flower {fl.__version__}")
+
+    NUM_CLIENTS = 5
+    BATCH_SIZE = 32
+    CLIENT_EPOCHS = 100
+    NR_ROUNDS = 10   # nr of rounds the federated learning should do
+    LEARNING_RATE = 0.0001
+
+    TIME = time.time()
+    TIME_ = time.time()
+
+    accuracies = []
+    losses = []
+    mae_losses = []
+
+    predicted_ = []
+    true_ = []
 
 
-print(f'nr of clients: {NUM_CLIENTS}\n'
-      f'batch size: {BATCH_SIZE}\n'
-      f'client epochs: {CLIENT_EPOCHS}\n'
-      f'nr of federated rounds: {NR_ROUNDS}\n'
-      f'learning rate: {LEARNING_RATE}')
+
+
+
+    trainloaders, valloaders, testloader, num_features = load_datasets()
+
+
+
+
+    NUM_FEATURES = num_features
+    print(f'Number of features: {NUM_FEATURES}')
+    OUT_FEATURES = 1
+    model = Net(NUM_FEATURES, OUT_FEATURES)
+    criterion = nn.MSELoss()      # Mean Square error loss function
+    #criterion = nn.Sigmoid()
+    #optimizer = optim.Adam(model.parameters(), LEARNING_RATE)    # Adam optimizer
+    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)     # Stochatic Gradient Descent
+    #scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, verbose=True)
+
+
+
+
+    # Create FedAvg strategy
+    strategy = fl.server.strategy.FedAvg(
+        # strategy = fl.server.strategy.FedAdagrad(
+        # Fraction_fit means how many of the clients participate every round. 1.0 = 100%, 0.5 = 50%
+        fraction_fit=1.0,
+        fraction_evaluate=0.5,  # percentage of clients randomly selected for evaluation
+        min_fit_clients=NUM_CLIENTS,  # could be lower than num_clients
+        # min_fit_clients=5,
+        min_evaluate_clients=NUM_CLIENTS,
+        # min_evaluate_clients=10,
+        min_available_clients=NUM_CLIENTS,
+        # min_available_clients=10,   # Wait until 10 clients are available should be NUM_CLIENTS
+        evaluate_metrics_aggregation_fn=weighted_average,  # <-- pass the metric aggregation function
+        evaluate_fn=evaluate,
+        on_fit_config_fn=get_on_fit_config_fn(),
+        # initial_parameters=fl.common.ndarrays_to_parameters(get_parameters(Net())), # used for FedAdagrad
+    )
+
+    # Specify client resources if you need GPU (defaults to 1 CPU and 0 GPU)
+    client_resources = None
+    if DEVICE.type == "cuda":
+        client_resources = {"num_gpus": 1}
+        print('cuda?')
+
+    # print('Yo got here!')
+
+    # Start simulation
+    fl.simulation.start_simulation(
+        client_fn=client_fn,
+        num_clients=NUM_CLIENTS,
+        config=fl.server.ServerConfig(num_rounds=NR_ROUNDS),  # num_rounds = 10
+        strategy=strategy,
+        client_resources=client_resources,
+    )
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Losses
+    nr = int(len(losses))
+    x_losses = list(range(nr))
+    y_losses = losses
+
+    plt.plot(x_losses, y_losses)
+    plt.title('Losses over rounds\n'
+              'Combined Cycle Power Plant')
+    plt.xlabel('Rounds of federated learning')
+    plt.ylabel('Loss')
+    plt.ylim(0,20)
+    plt.savefig('../images/losses_fl_combined_cycle_power_plant.png')
+    plt.show()
+
+    # Accuracy
+    nrr = int(len(accuracies))
+    x_acc = list(range(nrr))
+    y_acc = accuracies
+
+    plt.plot(x_acc, y_acc, color='red')
+    plt.title('R2-Accuracy over rounds\n'
+              'Combined Cycle Power Plant')
+    plt.xlabel('Rounds of federated learning')
+    plt.ylabel('Accuracy')
+    plt.ylim(0,1.1)
+    plt.savefig('../images/r2_accuracy_fl_combined_cycle_power_plant.png')
+    plt.show()
+
+
+    print(f'nr of clients: {NUM_CLIENTS}\n'
+          f'batch size: {BATCH_SIZE}\n'
+          f'client epochs: {CLIENT_EPOCHS}\n'
+          f'nr of federated rounds: {NR_ROUNDS}\n'
+          f'learning rate: {LEARNING_RATE}')
+
+    # Add results
+    results_dict = {'dataset': dataset_name, 'R2': accuracies[-1], 'MSE': losses[-1], 'MAE': mae_losses[-1]}
+    results.append(results_dict)
+
+
+print(results)
+
+# calculate mean results and 90% confidence interval
+# Extract R2 values from each dictionary
+r2_values = [d['R2'] for d in results]
+mean_r2 = np.mean(r2_values)
+std_r2 = np.std(r2_values)
+z_score = 1.645 # Define z-score for 90% confidence interval (around 1.645)
+margin_of_error = z_score * std_r2 # Calculate the margin of error
+#confidence_interval_percentage = margin_of_error
+
+mse_values = [d['MSE'] for d in results]
+mean_mse = np.mean(mse_values)
+std_mse = np.std(mse_values)
+margin_of_error_mse = z_score * std_mse # Calculate the margin of error
+
+mae_values = [d['MAE'] for d in results]
+mean_mae = np.mean(mae_values)
+std_mae = np.std(mae_values)
+margin_of_error_mae = z_score * std_mae # Calculate the margin of error
+
+
+print(f"mean R2: {mean_r2}, margin: {margin_of_error}")
+print(f"mean MSE: {mean_mse}, margin: {margin_of_error_mse}")
+print(f"mean MAE: {mean_mae}, margin: {margin_of_error_mae}")

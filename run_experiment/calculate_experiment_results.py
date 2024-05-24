@@ -1,7 +1,7 @@
 import json
 import numpy as np
 
-f = open('experiment_results_1client.txt', 'r')
+f = open('experiment_results_testing_rules.txt', 'r')
 #print(f.read())
 data = f.read()
 #print(data)

@@ -151,9 +151,9 @@ def get_model_results(feature_names, classifier):
 #files = [dataloaders.Dataloader_ailerons, dataloaders.Dataloader_combined_cycle_power_plant, dataloaders.Dataloader_creditcard_fraud, dataloaders.Dataloader_intrusion_detection_kdd, dataloaders.Dataloader_life_expectancy, dataloaders.Dataloader_maintenance_naval_propulsion, dataloaders.Dataloader_pima_indians_diabetes, dataloaders.Dataloader_smart_grid_stability, dataloaders.Dataloader_superconductivity, dataloaders.Dataloading_wine_quality]
 
 #files = [dataloaders.Dataloading_wine_quality]
-files = [dataloaders.Dataloader_ailerons]
+#files = [dataloaders.Dataloader_ailerons]
 #files = [dataloaders.Dataloader_combined_cycle_power_plant]
-#files = [dataloaders.Dataloader_life_expectancy]
+files = [dataloaders.Dataloader_life_expectancy]
 #files = [dataloaders.Dataloader_pima_indians_diabetes]
 #files = [dataloaders.Dataloader_pima_indians_diabetes, dataloaders.Dataloader_combined_cycle_power_plant]
 #files = [dataloaders.Dataloader_superconductivity, dataloaders.Dataloader_combined_cycle_power_plant]
@@ -260,14 +260,14 @@ for dataset_file in files:
 print(f'{regression_plot_data}')
 
 print(final_results)
-with open('experiment_results_testing.txt', 'w') as convert_file:
+with open('experiment_results_testing_rules.txt', 'w') as convert_file:
     convert_file.write(json.dumps(final_results))
 
 #json_string = json.dumps(regression_plot_data)
 #with open('experiment_plots_1client.txt', 'w') as f:
 #    f.write(json_string)
 
-with open('experiment_plots_testing.txt', 'w') as f:
+with open('experiment_plots_testing_rules.txt', 'w') as f:
     for key, value_list in regression_plot_data.items():
         for inner_list in value_list:
             joined_values = ','.join(map(str, inner_list))  # Join values with comma
